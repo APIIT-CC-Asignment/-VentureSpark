@@ -1,4 +1,10 @@
 import Image from "next/image";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Sign Up | VentureSpark",
+  description: "Sign up for VentureSpark to connect with investors and grow your business.",
+};
 
 export default function Signup() {
   return (

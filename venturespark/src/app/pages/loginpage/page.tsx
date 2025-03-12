@@ -1,7 +1,11 @@
 
 import React from 'react';
+import { Metadata } from "next";
 
-
+export const metadata: Metadata = {
+  title: "Login | VentureSpark",
+  description: "Login to VentureSpark to connect with investors and grow your business.",
+};
 export default function logingpage() {
     return (
     
