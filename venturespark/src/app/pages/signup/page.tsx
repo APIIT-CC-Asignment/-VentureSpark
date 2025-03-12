@@ -1,6 +1,35 @@
+"use client";
 import Image from "next/image";
+import { useState } from "react";
+
+
+// export const metadata: Metadata = {
+//   title: "Sign Up | VentureSpark",
+//   description: "Sign up for VentureSpark to connect with investors and grow your business.",
+// };
+
 
 export default function Signup() {
+
+    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [message, setMessage] = useState('');
+  
+    const handleRegister = async (e: React.FormEvent) => {
+      e.preventDefault();
+    
+      const res = await fetch('/api/auth/register', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password }),
+      });
+    
+      const data = await res.json();
+      setMessage(data.message);
+    };
+    
+    
   return (
    
 <div className="flex h-screen">
@@ -27,24 +56,26 @@ export default function Signup() {
       <div className="mt-4 text-sm text-gray-600 text-center">
         <p>or with email</p>
       </div>
-      <form action="#" method="POST" className="space-y-4">
+      <form onSubmit={handleRegister} method="POST" className="space-y-4">
         
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username</label>
-          <input type="text" id="username" name="username" className="mt-1 p-2 w-full border rounded-md focus:border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors duration-300" />
+          <label htmlFor="username"   className="block text-sm font-medium text-gray-700">Username</label>
+          <input type="text" id="username" name="username" value={username} onChange={(e) => setUsername(e.target.value)} required  className="mt-1 p-2 w-full border rounded-md focus:border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors duration-300 text-black" />
         </div>
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-          <input type="text" id="email" name="email" className="mt-1 p-2 w-full border rounded-md focus:border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors duration-300"/>
+          <input type="text" id="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 p-2 w-full border rounded-md focus:border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors duration-300  text-black"/>
         </div>
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
-          <input type="password" id="password" name="password" className="mt-1 p-2 w-full border rounded-md focus:border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors duration-300"/>
+          <input type="password" id="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required  className="mt-1 p-2 w-full border rounded-md focus:border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors duration-300  text-black"/>
         </div>
         <div>
-          <button type="submit" className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300">Sign Up</button>
+          <button type="submit" className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300">Sign Up</button>
         </div>
+        
       </form>
+        <p>{message}</p>
       <div className="mt-4 text-sm text-gray-600 text-center">
         <p>Already have an account? <a href="/pages/loginpage" className="text-black hover:underline">Login here</a>
         </p>
