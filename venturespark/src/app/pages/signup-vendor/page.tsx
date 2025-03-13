@@ -29,7 +29,7 @@ export default function Signup() {
     setStatus("Submitting...");
   
     try {
-      const response = await fetch("/api/register", {
+      const response = await fetch("/api/vendor", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -71,7 +71,7 @@ export default function Signup() {
   </div>
   <div className="w-full bg-gray-100 lg:w-1/2 flex items-center justify-center">
     <div className="max-w-md w-full p-6">
-      <h1 className="text-3xl font-semibold mb-6 text-black text-center">Client Sign Up</h1>
+      <h1 className="text-3xl font-semibold mb-6 text-black text-center">Vendor Sign Up</h1>
   
       <h1 className="text-sm font-semibold mb-6 text-gray-500 text-center">Join to Our Community with all time access and free </h1>
       <div className="mt-4 flex flex-col lg:flex-row items-center justify-between">
