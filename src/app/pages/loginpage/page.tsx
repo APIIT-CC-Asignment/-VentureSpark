@@ -66,20 +66,12 @@ const handleSubmit = async (e: React.FormEvent) => {
 					<h1 className="text-2xl font-semibold">Login VentureSpark</h1>
 				</div>
 				 <div className="mt-4 flex flex-col lg:flex-row items-center justify-between">
-					  <div className="w-full lg:w-1/2 mb-2 lg:mb-0">
-				  <button 
-					onClick={() => signIn("google")}
-					className="px-4 py-2 bg-white text-black rounded flex items-center"
-				  >
-					<img 
-					  src="/image/google.png" 
-					  alt="Google Logo" 
-					  className="w-5 h-5 mr-2"
-					/>
-					Sign In with Google
-				  </button>
-				</div>
-				
+					
+				<div className="w-full lg:w-1/2 ml-0 lg:ml-2">
+						  <button  onClick={() => signIn("google")} type="button" className="w-full flex justify-center items-center gap-2 bg-white text-sm text-gray-600 p-2 rounded-md hover:bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-300">
+							<img src="/image/google.png " alt="" /> Sign In with FaceBook </button>
+						</div>
+
 						<div className="w-full lg:w-1/2 ml-0 lg:ml-2">
 						  <button  onClick={() => signIn("facebook")} type="button" className="w-full flex justify-center items-center gap-2 bg-white text-sm text-gray-600 p-2 rounded-md hover:bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-300">
 							<img src="/image/fb.png " alt="" /> Sign In with FaceBook </button>
@@ -104,6 +96,10 @@ const handleSubmit = async (e: React.FormEvent) => {
 					</div>
 					</div>
 				</div>
+				<div className="mt-4 text-sm text-gray-600 text-center">
+        <p>Want To Create an account? <a href="/pages/signup" className="text-black hover:underline">SignUp here</a>
+        </p>
+      </div>
 			</form>
 			</div>
 		</div>
