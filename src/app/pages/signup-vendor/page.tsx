@@ -1,8 +1,7 @@
 "use client";
-import { signIn } from "next-auth/react";
 import Image from "next/image";
 import { useState } from "react";
-
+import { signIn } from "next-auth/react";
 
 // export const metadata: Metadata = {
 //   title: "Sign Up | VentureSpark",
@@ -76,25 +75,25 @@ export default function Signup() {
   
       <h1 className="text-sm font-semibold mb-6 text-gray-500 text-center">Join to Our Community with all time access and free </h1>
       <div className="mt-4 flex flex-col lg:flex-row items-center justify-between">
-           <div className="w-full lg:w-1/2 mb-2 lg:mb-0">
-       <button 
-         onClick={() => signIn("google")}
-         className="px-4 py-2 bg-white text-black rounded flex items-center"
-       >
-         <img 
-           src="/image/google.png" 
-           alt="Google Logo" 
-           className="w-5 h-5 mr-2"
-         />
-         Sign Up with Google
-       </button>
-     </div>
-     
-             <div className="w-full lg:w-1/2 ml-0 lg:ml-2">
-               <button  onClick={() => signIn("facebook")} type="button" className="w-full flex justify-center items-center gap-2 bg-white text-sm text-gray-600 p-2 rounded-md hover:bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-300">
-                 <img src="/image/fb.png " alt="" /> Sign Up with FaceBook </button>
-             </div>
-           </div>
+      <div className="w-full lg:w-1/2 mb-2 lg:mb-0">
+  <button 
+    onClick={() => signIn("google")}
+    className="px-4 py-2 bg-white text-black rounded flex items-center"
+  >
+    <img 
+      src="/image/google.png" 
+      alt="Google Logo" 
+      className="w-5 h-5 mr-2"
+    />
+    Sign Up with Google
+  </button>
+</div>
+
+        <div className="w-full lg:w-1/2 ml-0 lg:ml-2">
+          <button  onClick={() => signIn("facebook")} type="button" className="w-full flex justify-center items-center gap-2 bg-white text-sm text-gray-600 p-2 rounded-md hover:bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-300">
+            <img src="/image/fb.png " alt="" /> Sign Up with FaceBook </button>
+        </div>
+      </div>
       <div className="mt-4 text-sm text-gray-600 text-center">
         <p>or with email</p>
       </div>
