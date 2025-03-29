@@ -130,15 +130,4 @@ export default function Signup() {
   
   );
 }
-function setUsername(arg0: string) {
-  throw new Error("Function not implemented.");
-}
-
-function setEmail(arg0: string) {
-  throw new Error("Function not implemented.");
-}
-
-function setPassword(arg0: string) {
-  throw new Error("Function not implemented.");
-}
 
