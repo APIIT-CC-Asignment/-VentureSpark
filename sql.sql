@@ -11,6 +11,12 @@ CREATE TABLE Vendor (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+ALTER TABLE Vendor
+ADD COLUMN file_data LONGBLOB,   -- For storing the PDF file as binary data
+ADD COLUMN file_name VARCHAR(255);  -- To store the original file name
+
+
 -- CREATE TABLE Vendor_Reviews (
 --     id INT AUTO_INCREMENT PRIMARY KEY,
 --     vendor_id INT NOT NULL,

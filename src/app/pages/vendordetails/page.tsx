@@ -471,6 +471,54 @@ export default function VendorDetails() {
                     Business Registrations
                   </label>
                 </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="tex-consulting"
+                    value="Tex Consulting"
+                    checked={selectedServices.includes("Tex Consulting")}
+                    onChange={handleCheckboxChange}
+                    className="mr-2"
+                  />
+                  <label
+                    htmlFor="tex-consulting"
+                    className="text-gray-500 font-serif text-sm"
+                  >
+                    Tex Consulting
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="legalservices"
+                    value="Legal Services"
+                    checked={selectedServices.includes("Legal Services")}
+                    onChange={handleCheckboxChange}
+                    className="mr-2"
+                  />
+                  <label
+                    htmlFor="legalservices"
+                    className="text-gray-500 font-serif text-sm"
+                  >
+                    Legal Services 
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="HRservices"
+                    value="Human Resources (HR) Services"
+                    checked={selectedServices.includes("Human Resources (HR) Services")}
+                    onChange={handleCheckboxChange}
+                    className="mr-2"
+                  />
+                  <label
+                    htmlFor="HRservices"
+                    className="text-gray-500 font-serif text-sm"
+                  >
+                    Human Resources (HR) Services
+                  </label>
+                </div>
               </div>
             </div>
 
