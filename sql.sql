@@ -1,3 +1,5 @@
+-- hi Team
+
 CREATE TABLE Vendor (
     id INT AUTO_INCREMENT PRIMARY KEY,
     service_name VARCHAR(255) NOT NULL,
