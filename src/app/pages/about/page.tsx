@@ -26,7 +26,7 @@ export default function AboutPage() {
       name: "Mihilayan Sachinthana",
       title: "Marketing Specialist",
       expertise: "Digital Marketing & Growth Hacking",
-      image: "/images/mihi.png",
+      image: "/images/mihi.jpeg",
       quote: "Technology should enable, not complicate."
     },
     {
@@ -40,7 +40,7 @@ export default function AboutPage() {
       name: "Abdul Hakeem",
       title: "Technology Advisor",
       expertise: "AI & Blockchain Solutions",
-      image: "/images/hakeem.jpg",
+      image: "/images/hakeem.avif",
       quote: "Precision in process creates freedom to innovate."
     },
     {

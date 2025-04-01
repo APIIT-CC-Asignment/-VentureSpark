@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import router from "next/router";
 
 // export const metadata: Metadata = {
 //   title: "Sign Up | VentureSpark",
@@ -28,35 +29,35 @@ export default function Signup() {
     e.preventDefault();
     setStatus("Submitting...");
   
-    try {
-      const response = await fetch("/api/vendor", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+   try {
+  const response = await fetch("/api/vendor", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(formData),
+  });
   
-      const data = await response.json();
+  const data = await response.json();
   
-      if (response.ok) {
-        setStatus("Registration successful!");
-        alert("Registration successful!");
-        
-        setFormData({ username: "", email: "", password: "", message: "" });
-      } else {
-        if (response.status === 409) {
-          setStatus(`Error: ${data.message}`);
-          alert(data.message);
-        } else {
-          setStatus(`Error: ${data.message}`);
-          alert(`Error: ${data.message}`);
-        }
-      }
-    } catch (error) {
-      setStatus("Error: Could not connect to server");
-      alert("Error: Could not connect to server");
+  if (response.ok) {
+    setStatus("Registration successful!");
+    alert("Registration successful!");
+    router.push("/pages/vendordetails");
+    setFormData({ username: "", email: "", password: "", message: "" });
+  } else {
+    if (response.status === 409) {
+      setStatus(`Error: ${data.message}`);
+      alert(data.message);
+    } else {
+      setStatus(`Error: ${data.message}`);
+      alert(`Error: ${data.message}`);
     }
+  }
+} catch (error) {
+  setStatus("Error: Could not connect to server");
+  alert("Error: Could not connect to server");
+}
   };
     
     
@@ -66,7 +67,7 @@ export default function Signup() {
 
   <div className="hidden lg:flex items-center justify-center flex-1 bg-white text-black">
     <div className="max-w-md text-center">
-        <img src="/image/logo.png" alt="" />
+        <img src="/images/logo.png" alt="" />
     </div>
   </div>
   <div className="w-full bg-gray-100 lg:w-1/2 flex items-center justify-center">
@@ -81,7 +82,7 @@ export default function Signup() {
     className="px-4 py-2 bg-white text-black rounded flex items-center"
   >
     <img 
-      src="/image/google.png" 
+      src="/images/google.png" 
       alt="Google Logo" 
       className="w-5 h-5 mr-2"
     />
@@ -91,7 +92,7 @@ export default function Signup() {
 
         <div className="w-full lg:w-1/2 ml-0 lg:ml-2">
           <button  onClick={() => signIn("facebook")} type="button" className="w-full flex justify-center items-center gap-2 bg-white text-sm text-gray-600 p-2 rounded-md hover:bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-300">
-            <img src="/image/fb.png " alt="" /> Sign Up with FaceBook </button>
+            <img src="/images/fb.png " alt="" /> Sign Up with FaceBook </button>
         </div>
       </div>
       <div className="mt-4 text-sm text-gray-600 text-center">
@@ -128,17 +129,4 @@ export default function Signup() {
   </div>
 </div>
   
-  );
-}
-function setUsername(arg0: string) {
-  throw new Error("Function not implemented.");
-}
-
-function setEmail(arg0: string) {
-  throw new Error("Function not implemented.");
-}
-
-function setPassword(arg0: string) {
-  throw new Error("Function not implemented.");
-}
-
+  )}

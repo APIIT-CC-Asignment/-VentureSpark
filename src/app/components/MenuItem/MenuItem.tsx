@@ -23,6 +23,7 @@ function MenuItem({ linkurl, linktext, mobile = false }: MenuItemProps) {
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-green-600 transition-all duration-300 group-hover:w-full"></span>
       )}
     </Link>
+    
   );
 }
 

@@ -23,6 +23,7 @@ export default function VendorDetails() {
     address: "",
     selected_services: [] as string[],
     type: "Services",
+    expertise_in: ""
   });
 
   useEffect(() => {
@@ -61,50 +62,52 @@ export default function VendorDetails() {
     }
     
     try {
-      const response = await fetch("/api/vendordetailsreg", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert("Registration successful!");
-        setFormData({
-          service_name: "",
-          years_of_excellence: 0,
-          email: email || "",
-          contact_number: "",
-          address: "",
-          selected_services: [],
-          type: "Services",
+      if (localStorage.getItem("email") != null) {
+        const response = await fetch("/api/vendordetailsreg", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formData),
         });
-        setSelectedServices([]);
-      } else {
-        if (response.status === 409) {
-          alert(data.message);
+  
+        const data = await response.json();
+  
+        if (response.ok) {
+          alert("Registration successful!");
+          setFormData({
+            service_name: "",
+            years_of_excellence: 0,
+            email: email || "",
+            contact_number: "",
+            address: "",
+            selected_services: [],
+            type: "Services",
+            expertise_in: ""
+          });
+          setSelectedServices([]);
         } else {
-          alert(`Error: ${data.message}`);
+          if (response.status === 409) {
+            alert(data.message);
+          } else {
+            alert(`Error: ${data.message}`);
+          }
         }
+      } else {
+        alert("Please login to register");
       }
     } catch (error) {
       alert("Error: Could not connect to server");
     }
   };
-  
     
   return (
     <div>
+      <HeaderContent />
     
-    <HeaderContent />
-
-      <div className="flex grid-cols-2 gap-4 items-center justify-center min-h-screen p-6 bg-gray-100 ">
-        {/* Left Section */}
-        <div className="md:w-1/2 p-6 mt-8 bg-white rounded-lg shadow-md">
-          <h1 className="text-3xl font-bold mb-4 font-Positivus text-black">
+      <div className="flex flex-col md:flex-row gap-6 items-stretch justify-center bg-gray-100 px-4 py-24">
+        <div className="w-full md:w-1/2 p-6 bg-white rounded-lg shadow-md flex flex-col mt-8 md:mt-0">
+          <h1 className="text-2xl md:text-3xl font-bold mb-4 font-Positivus text-black">
             Join Our Expert Network
           </h1>
           <p className="text-black mb-6">
@@ -116,100 +119,33 @@ export default function VendorDetails() {
             <span>Learn More....</span>
           </button>
           {/* Benefits */}
-          <div className="mt-6 space-y-4">
-            <div className="flex items-center p-4 border rounded-lg shadow-sm bg-white">
-              <span className="text-2xl mr-4">🌍</span>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Expand your Reach
-                </h2>
-                <p className="text-gray-600">
-                  Connect with a growing network of ambitious entrepreneurs and
-                  scale your service business.
-                </p>
+          <div className="mt-6 space-y-4 flex-grow">
+            {[
+              { emoji: "🌍", title: "Expand your Reach", description: "Connect with a growing network of ambitious entrepreneurs and scale your service business." },
+              { emoji: "➕", title: "Qualified Leads", description: "Access pre-qualified clients who are actively seeking your expertise and services." },
+              { emoji: "💼", title: "Business Growth", description: "Leverage the platform's tools and resources to accelerate the growth of your business." },
+              { emoji: "📊", title: "Analytics and Insights", description: "Gain valuable insights into your business performance and make data-driven decisions." },
+              { emoji: "💡", title: "Expert Guidance", description: "Receive expert guidance from industry professionals to help you overcome challenges and achieve success." },
+              { emoji: "🌱", title: "Continuous Learning", description: "Access a library of educational resources and training to keep improving your skills and knowledge." },
+              { emoji: "🤝", title: "Collaborative Opportunities", description: "Engage in collaborative opportunities with other entrepreneurs to create mutually beneficial partnerships." }
+            ].map((benefit, index) => (
+              <div key={index} className="flex items-center p-3 md:p-4 border rounded-lg shadow-sm bg-white">
+                <span className="text-xl md:text-2xl mr-3 md:mr-4">{benefit.emoji}</span>
+                <div>
+                  <h2 className="text-lg md:text-xl font-semibold text-gray-800">{benefit.title}</h2>
+                  <p className="text-sm md:text-base text-gray-600">{benefit.description}</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center p-4 border rounded-lg shadow-sm bg-white">
-              <span className="text-2xl mr-4">➕</span>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Qualified Leads
-                </h2>
-                <p className="text-gray-600">
-                  Access pre-qualified clients who are actively seeking your
-                  expertise and services.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center p-4 border rounded-lg shadow-sm bg-white">
-              <span className="text-2xl mr-4">💼</span>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Business Growth
-                </h2>
-                <p className="text-gray-600">
-                  Leverage the platform's tools and resources to accelerate the
-                  growth of your business.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center p-4 border rounded-lg shadow-sm bg-white">
-              <span className="text-2xl mr-4">📊</span>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Analytics and Insights
-                </h2>
-                <p className="text-gray-600">
-                  Gain valuable insights into your business performance and make
-                  data-driven decisions.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center p-4 border rounded-lg shadow-sm bg-white">
-              <span className="text-2xl mr-4">💡</span>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Expert Guidance
-                </h2>
-                <p className="text-gray-600">
-                  Receive expert guidance from industry professionals to help
-                  you overcome challenges and achieve success.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center p-4 border rounded-lg shadow-sm bg-white">
-              <span className="text-2xl mr-4">🌱</span>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Continuous Learning
-                </h2>
-                <p className="text-gray-600">
-                  Access a library of educational resources and training to keep
-                  improving your skills and knowledge.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center p-4 border rounded-lg shadow-sm bg-white">
-              <span className="text-2xl mr-4">🤝</span>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Collaborative Opportunities
-                </h2>
-                <p className="text-gray-600">
-                  Engage in collaborative opportunities with other entrepreneurs
-                  to create mutually beneficial partnerships.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-
+    
         {/* Right Section */}
-        <div className="md:w-1/3 p-6 bg-lime-300 rounded-lg shadow-md">
-          <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">
+        <div className="w-full md:w-1/3 p-6 bg-lime-300 rounded-lg shadow-md flex flex-col mt-8 md:mt-0">
+          <h2 className="text-xl md:text-2xl font-bold mb-4 text-center text-gray-800">
             Quick Register
           </h2>
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4 flex-grow" onSubmit={handleSubmit}>
             <div>
               <label className="block text-gray-700 font-medium">
                 Service Name
@@ -233,12 +169,28 @@ export default function VendorDetails() {
                 onChange={handleChange}
               >
                 <option value="Services">Services</option>
-                <option value="Consulting">Consulting</option>
+                <option value="finance">Finance Consulting</option>
+                <option value="legal">Legal Consulting</option>
+                <option value="business">Business Consulting</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-gray-700 font-medium ">
+              <label className="block text-gray-700 font-medium">
+              Expertise In
+              </label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded text-gray-800"
+                placeholder="Expertise In"
+                name="expertise_in"
+                onChange={handleChange}
+                value={formData.expertise_in}
+              />
+            </div>
+
+            <div>
+              <label className="block text-gray-700 font-medium">
                 Years Of Industry Excellence
               </label>
               <input
@@ -264,7 +216,7 @@ export default function VendorDetails() {
                 readOnly
               />
             </div>
-
+    
             <div>
               <label className="block text-gray-700 font-medium">
                 Contact Number
@@ -291,241 +243,43 @@ export default function VendorDetails() {
               />
             </div>
             {/* Multiple Services Selection */}
-            <div className="space-y-4 ">
-              <label className="block text-gray-700 font-medium">
-                Select Services
-              </label>
-              <div className="space-y-2 grid grid-cols-2 md:grid-cols-2 gap-4">
-                <div className="items-center">
-                  <input
-                    type="checkbox"
-                    id="tech-solutions"
-                    value="Technology Solutions"
-                    checked={selectedServices.includes("Technology Solutions")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2 text-gray-800"
-                  />
-                  <label
-                    htmlFor="tech-solutions"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Technology Solutions
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="marketing-services"
-                    value="Marketing Services"
-                    checked={selectedServices.includes("Marketing Services")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="marketing-services"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Marketing Services
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="financial-consulting"
-                    value="Financial Consulting"
-                    checked={selectedServices.includes("Financial Consulting")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="financial-consulting"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Financial Consulting
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="branding"
-                    value="Branding"
-                    checked={selectedServices.includes("Branding")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="branding"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Branding
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="web-development"
-                    value="Web Development"
-                    checked={selectedServices.includes("Web Development")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="web-development"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Web Development
-                  </label>
-                </div>
-
-                {/* Additional Services */}
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="seo-services"
-                    value="SEO Services"
-                    checked={selectedServices.includes("SEO Services")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="seo-services"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    SEO Services
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="content-writing"
-                    value="Content Writing"
-                    checked={selectedServices.includes("Content Writing")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="content-writing"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Content Writing
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="app-development"
-                    value="App Development"
-                    checked={selectedServices.includes("App Development")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="app-development"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    App Development
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="graphic-design"
-                    value="Graphic Design"
-                    checked={selectedServices.includes("Graphic Design")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="graphic-design"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Graphic Design
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="video-production"
-                    value="Video Production"
-                    checked={selectedServices.includes("Video Production")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="video-production"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Video Production
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="business-registrations"
-                    value="Business Registrations"
-                    checked={selectedServices.includes("Business Registrations")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="business-registrations"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Business Registrations
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="tex-consulting"
-                    value="Tex Consulting"
-                    checked={selectedServices.includes("Tex Consulting")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="tex-consulting"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Tex Consulting
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="legalservices"
-                    value="Legal Services"
-                    checked={selectedServices.includes("Legal Services")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="legalservices"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Legal Services 
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="HRservices"
-                    value="Human Resources (HR) Services"
-                    checked={selectedServices.includes("Human Resources (HR) Services")}
-                    onChange={handleCheckboxChange}
-                    className="mr-2"
-                  />
-                  <label
-                    htmlFor="HRservices"
-                    className="text-gray-500 font-serif text-sm"
-                  >
-                    Human Resources (HR) Services
-                  </label>
-                </div>
+            <div className="space-y-3">
+              <label className="block text-gray-700 font-medium">Select Services</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  { id: "tech-solutions", label: "Technology Solutions" },
+                  { id: "marketing-services", label: "Marketing Services" },
+                  { id: "financial-consulting", label: "Financial Consulting" },
+                  { id: "branding", label: "Branding" },
+                  { id: "web-development", label: "Web Development" },
+                  { id: "seo-services", label: "SEO Services" },
+                  { id: "content-writing", label: "Content Writing" },
+                  { id: "app-development", label: "App Development" },
+                  { id: "graphic-design", label: "Graphic Design" },
+                  { id: "video-production", label: "Video Production" },
+                  { id: "business-registrations", label: "Business Registrations" },
+                  { id: "tex-consulting", label: "Tex Consulting" },
+                  { id: "legalservices", label: "Legal Services" },
+                  { id: "HRservices", label: "Human Resources (HR) Services" },
+                ].map((service, index) => (
+                  <div key={index} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={service.id}
+                      value={service.label}
+                      checked={selectedServices.includes(service.label)}
+                      onChange={handleCheckboxChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor={service.id} className="text-gray-500 text-sm">
+                      {service.label}
+                    </label>
+                  </div>
+                ))}
               </div>
             </div>
-
-            <button className="w-full bg-black text-white py-2 rounded hover:bg-gray-800">
+    
+            <button className="w-full bg-black text-white py-2 rounded hover:bg-gray-800 mt-4">
               Register
             </button>
           </form>

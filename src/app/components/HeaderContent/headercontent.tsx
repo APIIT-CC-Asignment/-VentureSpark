@@ -144,7 +144,7 @@ function HeaderContent() {
       {/* Profile Dropdown - Desktop */}
       {isDropdownVisible && (
         <motion.div
-          className="absolute right-0 mt-2 p-4 bg-white rounded-lg shadow-lg w-48"
+          className="absolute right-0 mt-2 p-4 bg-white rounded-lg shadow-lg w-48 hidden lg:block"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}

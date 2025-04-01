@@ -14,7 +14,9 @@ CREATE TABLE Vendor (
 
 ALTER TABLE Vendor
 ADD COLUMN file_data LONGBLOB,   -- For storing the PDF file as binary data
-ADD COLUMN file_name VARCHAR(255);  -- To store the original file name
+ADD COLUMN expertise_in VARCHAR(30);  -- To store the original file name
+
+
 
 
 -- CREATE TABLE Vendor_Reviews (

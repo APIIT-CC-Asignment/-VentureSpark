@@ -138,7 +138,15 @@ export default function LoginPage() {
                 <p>
                   Want To Create an account?{" "}
                   <a href="/pages/signup" className="text-black hover:underline">
-                    SignUp here
+                    As a Cleient SignUp here
+                  </a>
+                </p>
+              </div>
+              <div className="mt-4 text-sm text-gray-600 text-center">
+                <p>
+                  Want To Create an account?{" "}
+                  <a href="/pages/signup" className="text-black hover:underline">
+                    As a Service Provider SignUp here
                   </a>
                 </p>
               </div>
