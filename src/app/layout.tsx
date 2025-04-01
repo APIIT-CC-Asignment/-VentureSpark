@@ -1,8 +1,9 @@
+// src/app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google"; // Corrected imports
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -13,14 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VentureSpark",
-  description: "VentureSpark is a platform for entrepreneurs to connect with investors and grow their businesses.",
-  icons: [
-    {
-      url: "/image/logo.png",
-      rel: "icon",
-    },
-  ],
+  title: "Venture Spark",
+  description: "Book consultations with expert advisors",
 };
 
 export default function RootLayout({
@@ -30,10 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
         {children}
-        
       </body>
     </html>
   );

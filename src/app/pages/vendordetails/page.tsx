@@ -1,6 +1,8 @@
 "use client";
+import FooterContent from "@/app/components/FooterContent/footercontent";
+import HeaderContent from "@/app/components/HeaderContent/headercontent";
 import { useState, useEffect } from "react";
-import Navbar from "@/app/components/Navbar";
+
 import React from "react";
 
 export default function VendorDetails() {
@@ -96,11 +98,12 @@ export default function VendorDetails() {
     
   return (
     <div>
-      <Navbar />
+    
+    <HeaderContent />
 
-      <div className="flex grid-cols-2 gap-4 items-center justify-center min-h-screen p-6 bg-gray-100">
+      <div className="flex grid-cols-2 gap-4 items-center justify-center min-h-screen p-6 bg-gray-100 ">
         {/* Left Section */}
-        <div className="md:w-1/2 p-6">
+        <div className="md:w-1/2 p-6 mt-8 bg-white rounded-lg shadow-md">
           <h1 className="text-3xl font-bold mb-4 font-Positivus text-black">
             Join Our Expert Network
           </h1>
@@ -528,6 +531,7 @@ export default function VendorDetails() {
           </form>
         </div>
       </div>
+      <FooterContent />
     </div>
   );
 }

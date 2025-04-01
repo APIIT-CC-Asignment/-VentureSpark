@@ -71,7 +71,7 @@ export default function LoginPage() {
                   type="button"
                   className="w-full flex justify-center items-center gap-2 bg-white text-sm text-gray-600 p-2 rounded-md hover:bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-300"
                 >
-                  <img src="/image/google.png" alt="" /> Sign In with Google
+                  <img src="/images/google.png" alt="" /> Sign In with Google
                 </button>
               </div>
 
@@ -81,7 +81,7 @@ export default function LoginPage() {
                   type="button"
                   className="w-full flex justify-center items-center gap-2 bg-white text-sm text-gray-600 p-2 rounded-md hover:bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-300"
                 >
-                  <img src="/image/fb.png" alt="" /> Sign In with Facebook
+                  <img src="/images/fb.png" alt="" /> Sign In with Facebook
                 </button>
               </div>
             </div>
