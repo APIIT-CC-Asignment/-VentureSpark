@@ -1,4 +1,4 @@
--- Hey Fucking Team--
+-- Hey  Team--
 
 CREATE TABLE Vendor (
     id INT AUTO_INCREMENT PRIMARY KEY,
