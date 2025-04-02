@@ -27,7 +27,7 @@ export default function VendorDetails() {
   });
 
   useEffect(() => {
-    // Update formData when email is loaded from localStorage
+    
     if (email) {
       setFormData(prev => ({ ...prev, email }));
     }

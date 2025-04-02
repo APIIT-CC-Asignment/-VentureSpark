@@ -11,7 +11,7 @@ function MenuLink({ mobile = false }) {
       <MenuItem linktext="Services" linkurl="/pages/booking" mobile={mobile} />
       <MenuItem linktext="Contact" linkurl="/pages/contact" mobile={mobile} />
       
-      <MenuItem linktext="Registation" linkurl="pages/vendordetails" mobile={mobile} 
+      <MenuItem linktext="Registation" linkurl="/pages/vendordetails" mobile={mobile} 
       
       />
     </nav>

@@ -19,6 +19,18 @@ ADD COLUMN file_data LONGBLOB,   -- For storing the PDF file as binary data
 ADD COLUMN expertise_in VARCHAR(30);  -- To store the original file name
 
 
+CREATE TABLE booking (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    request_date DATE NOT NULL,
+    what_you_need TEXT,
+    createdate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    committed BOOLEAN DEFAULT FALSE
+    Requstedservice TEXT,
+);
+
+
 
 
 -- CREATE TABLE Vendor_Reviews (
