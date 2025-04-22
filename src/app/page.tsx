@@ -105,7 +105,7 @@ export default function Home() {
             className="flex flex-col sm:flex-row justify-center gap-4"
           >
             <a
-              href="/booking"
+              href="/pages/booking"
               className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-8 py-4 rounded-full font-semibold text-lg shadow-lg transition-all"
             >
               Book a Consultation

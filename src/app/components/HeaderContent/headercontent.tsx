@@ -65,14 +65,14 @@ function HeaderContent() {
           {/* Logo */}
           <motion.a
             href="/"
-            className="flex-shrink-0 flex items-center"
+            className="flex-shrink-0 flex items-center" 
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.2 }}
           >
             <img
               src="/images/logo.png"
               alt="Company Logo"
-              className="h-8 w-auto md:h-10"
+              className="sm:h-10 h-16 w-auto md:h-16 lg:h-16 rounded-md"
             />
           </motion.a>
 

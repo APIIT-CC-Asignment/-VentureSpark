@@ -22,6 +22,7 @@ export default function LoginPage() {
       const session = await getSession();
       if (session) {
         localStorage.setItem("email", session.user?.email || "");
+        localStorage.setItem("name", session.user?.name || "");
         localStorage.setItem("image", session.user?.image || "");
       }
     };
@@ -145,7 +146,7 @@ export default function LoginPage() {
               <div className="mt-4 text-sm text-gray-600 text-center">
                 <p>
                   Want To Create an account?{" "}
-                  <a href="/pages/signup" className="text-black hover:underline">
+                  <a href="/pages/signup-vendor" className="text-black hover:underline">
                     As a Service Provider SignUp here
                   </a>
                 </p>

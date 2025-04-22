@@ -35,10 +35,8 @@ export async function POST(req: { json: () => Promise<{ service_name: string; ye
       );
     }
 
-    // Convert the selected services to a string (JSON format)
     const selectedServicesString = JSON.stringify(selected_services);
 
-    // Insert vendor details into the database
     await db.query(
       "INSERT INTO Vendor (service_name, years_of_excellence, email, contact_number, address, selected_services, type, expertise_in) VALUES (?, ?, ?, ?, ?, ?, ?,?)",
       [service_name, years_of_excellence, email, contact_number, address, selectedServicesString, type, expertise_in]

@@ -12,6 +12,7 @@ export default function VendorDetails() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setEmail(localStorage.getItem("email"));
+      
     }
   }, []);
 
@@ -141,7 +142,7 @@ export default function VendorDetails() {
         </div>
     
         {/* Right Section */}
-        <div className="w-full md:w-1/3 p-6 bg-lime-300 rounded-lg shadow-md flex flex-col mt-8 md:mt-0">
+        <div className="w-full md:w-1/3 p-6 bg-white rounded-lg shadow-md flex flex-col mt-8 md:mt-0">
           <h2 className="text-xl md:text-2xl font-bold mb-4 text-center text-gray-800">
             Quick Register
           </h2>

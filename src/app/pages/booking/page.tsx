@@ -36,11 +36,15 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
    const [email, setEmail] = useState<string | null>(null);
+   const [name, setName] = useState<string | null>(null);
   
 useEffect(() => {
     
     if (email) {
       setFormData(prev => ({ ...prev, email }));
+    }
+    if (name){
+      setFormData(prev => ({ ...prev, name }));
     }
   }, [email]);
 
@@ -50,6 +54,7 @@ useEffect(() => {
     useEffect(() => {
       if (typeof window !== "undefined") {
         setEmail(localStorage.getItem("email"));
+        setName(localStorage.getItem("name"));
       }
     }, []);
 
@@ -424,129 +429,136 @@ useEffect(() => {
         )}
       </section>
 
-      {/* Booking Form Section */}
-      {selectedResource && (
-        <motion.section
-          id="booking-form"
-          className="py-20 bg-white"
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-4xl font-bold text-[#1E3A8A] mb-10 text-center">
-              Book {selectedResource.name}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
 
-            <div>
-                <label
-                  htmlFor="name"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                 Selected Service
-                </label>
-                <input
-                  type="text"
-                  id="servicename"
-                  name="servicename"
-                  value={selectedResource.name}
-                  onChange={handleChange}
-                  className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="name"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Your Full Name
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Email Address
-                </label>
-                <input
-                   value={email || ""}
-                   name="email"
-                   id="email"
-                   readOnly
-                  onChange={handleChange}
-                  className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white  text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="date"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Preferred Date
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  min={minDate}
-                  className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="message"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Your Needs
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  value={formData.message}
-                  onChange={handleChange}
-                  rows={4}
-                  className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white  text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
-                  placeholder="What do you want to achieve?"
-                />
-              </div>
-
-              <motion.button
-                type="submit"
-                className="w-full bg-[#F59E0B] text-white px-6 py-4 rounded-full font-semibold text-lg shadow-md"
-                whileHover={{
-                  scale: 1.05,
-                  boxShadow: "0 6px 20px rgba(245, 158, 11, 0.3)",
-                }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-              >
-                Lock in Your Session
-              </motion.button>
-            </form>
+      {email && email.length > 0 ? (
+  selectedResource && (
+    <motion.section
+      id="booking-form"
+      className="py-20 bg-white"
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 className="text-4xl font-bold text-[#1E3A8A] mb-10 text-center">
+          Book {selectedResource.name}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label
+              htmlFor="servicename"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Selected Service
+            </label>
+            <input
+              type="text"
+              id="servicename"
+              name="servicename"
+              value={selectedResource.name}
+              onChange={handleChange}
+              className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
+              required
+            />
           </div>
-        </motion.section>
-      )}
 
+          <div>
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Your Full Name
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={name || ""}
+              onChange={handleChange}
+              className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Email Address
+            </label>
+            <input
+              value={email || ""}
+              name="email"
+              id="email"
+              readOnly
+              onChange={handleChange}
+              className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white  text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="date"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Preferred Date
+            </label>
+            <input
+              type="date"
+              id="date"
+              name="date"
+              value={formData.date}
+              onChange={handleChange}
+              min={minDate}
+              className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="message"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Your Needs
+            </label>
+            <textarea
+              id="message"
+              name="message"
+              value={formData.message}
+              onChange={handleChange}
+              rows={4}
+              className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white  text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
+              placeholder="What do you want to achieve?"
+            />
+          </div>
+
+          <motion.button
+            type="submit"
+            className="w-full bg-[#F59E0B] text-white px-6 py-4 rounded-full font-semibold text-lg shadow-md"
+            whileHover={{
+              scale: 1.05,
+              boxShadow: "0 6px 20px rgba(245, 158, 11, 0.3)",
+            }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+          >
+            Lock in Your Session
+          </motion.button>
+        </form>
+      </div>
+    </motion.section>
+  )
+) : (
+  <p id="booking-form" className="text-center text-red-600 font-semibold text-2xl mb-10">
+    Please sign up to book an appointment.
+  </p>
+)}
+
+
+    
       {/* Footer */}
       <FooterContent />
     </div>
