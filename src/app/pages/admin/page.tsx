@@ -342,7 +342,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { useRouter } from "next/navigation"; // Import router for navigation
+import { useRouter } from "next/navigation";
 
 const pieData = [
   { name: "Inpatients", value: 72 },
@@ -363,36 +363,37 @@ const barData = [
   { name: "Mar", inpatients: 3200, outpatients: 850 },
 ];
 
-const COLORS = ["#0d9488", "#34d399"]; // Teal & Green
+// Updated color scheme to match the blue-to-teal gradient
+const COLORS = ["#1e40af", "#0d9488"]; // Dark blue & Teal
 
 const AdminPage = () => {
   const router = useRouter();
 
   const handlePendingClick = () => {
-    router.push("/pages/pvendors"); // Navigate to pending vendor page
+    router.push("/pages/pvendors");
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-800">
-      {/* Header */}
-      <header className="sticky top-4 z-40 mx-4 mt-4 bg-white shadow-lg border border-gray-100 rounded-2xl px-6 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-gray-50 text-gray-800">
+      {/* Header - Updated to full width by removing mx-4 */}
+      <header className="sticky top-0 z-40 w-full bg-gradient-to-r from-blue-800 to-teal-600 text-white shadow-lg px-6 py-4 flex justify-between items-center">
         <img src="/logo.png" alt="Venture Spark Logo" className="h-10" />
-        <nav className="hidden md:flex gap-6 font-semibold text-gray-700">
-          <a href="#" className="hover:text-teal-600 transition">Home</a>
-          <a href="#" className="hover:text-teal-600 transition">About</a>
-          <a href="#" className="hover:text-teal-600 transition">Services</a>
-          <a href="#" className="hover:text-teal-600 transition">Contact</a>
-          <a href="#" className="hover:text-teal-600 transition">Registration</a>
+        <nav className="hidden md:flex gap-6 font-semibold text-white">
+          <a href="#" className="hover:text-teal-200 transition">Home</a>
+          <a href="#" className="hover:text-teal-200 transition">About</a>
+          <a href="#" className="hover:text-teal-200 transition">Services</a>
+          <a href="#" className="hover:text-teal-200 transition">Contact</a>
+          <a href="#" className="hover:text-teal-200 transition">Registration</a>
         </nav>
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold text-teal-700">Venture Spark Admin</h1>
-          <div className="w-10 h-10 rounded-full bg-gray-300 border border-gray-200 shadow-inner" />
+          <h1 className="text-xl font-bold text-white">Venture Spark Admin</h1>
+          <div className="w-10 h-10 rounded-full bg-white border border-white shadow-inner" />
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 pt-28 pb-16">
-        <h2 className="text-3xl font-extrabold text-teal-700 text-center mb-10">
+      <main className="max-w-7xl mx-auto px-4 pt-20 pb-16">
+        <h2 className="text-3xl font-extrabold text-green-300 text-center mb-10">
           Admin Dashboard
         </h2>
 
@@ -403,7 +404,7 @@ const AdminPage = () => {
             onClick={handlePendingClick}
             className="cursor-pointer bg-white rounded-2xl shadow-lg border border-gray-100 p-6 transition transform hover:-translate-y-1 hover:shadow-xl"
           >
-            <h3 className="text-2xl font-bold text-teal-700 mb-2">
+            <h3 className="text-2xl font-bold text-blue-800 mb-2">
               Vendor Applications
             </h3>
             <p className="text-gray-600 mb-6">
@@ -413,7 +414,7 @@ const AdminPage = () => {
               <button className="flex-1 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition font-semibold">
                 ✅ Approve
               </button>
-              <button className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition font-semibold">
+              <button className="flex-1 bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition font-semibold">
                 ❌ Reject
               </button>
             </div>
@@ -421,7 +422,7 @@ const AdminPage = () => {
 
           {/* User */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 transition transform hover:-translate-y-1 hover:shadow-xl">
-            <h3 className="text-2xl font-bold text-teal-700 mb-2">
+            <h3 className="text-2xl font-bold text-blue-800 mb-2">
               User Applications
             </h3>
             <p className="text-gray-600 mb-6">
@@ -431,7 +432,7 @@ const AdminPage = () => {
               <button className="flex-1 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition font-semibold">
                 ✅ Approve
               </button>
-              <button className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition font-semibold">
+              <button className="flex-1 bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition font-semibold">
                 ❌ Reject
               </button>
             </div>
@@ -441,7 +442,7 @@ const AdminPage = () => {
         {/* Analytics Section */}
         <section className="mt-16">
           <div className="text-center mb-8">
-            <h3 className="text-3xl font-extrabold text-teal-700">Patient Analytics</h3>
+            <h3 className="text-3xl font-extrabold text-blue-800">Patient Analytics</h3>
             <p className="text-gray-500 mt-2">
               Snapshot of patient metrics and trends
             </p>
@@ -451,15 +452,15 @@ const AdminPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 text-center">
               <h4 className="text-gray-500 mb-1">Total Patients</h4>
-              <p className="text-4xl font-bold text-teal-700">3,256</p>
+              <p className="text-4xl font-bold text-green-700">3,256</p>
             </div>
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 text-center">
               <h4 className="text-gray-500 mb-1">Available Staff</h4>
-              <p className="text-4xl font-bold text-teal-700">394</p>
+              <p className="text-4xl font-bold text-blue-800">394</p>
             </div>
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 text-center">
               <h4 className="text-gray-500 mb-1">Avg. Treatment Cost</h4>
-              <p className="text-4xl font-bold text-teal-700">$2,536</p>
+              <p className="text-4xl font-bold text-blue-800">$2,536</p>
             </div>
           </div>
 
@@ -467,7 +468,7 @@ const AdminPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Bar Chart */}
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-              <h4 className="text-xl font-semibold text-gray-700 mb-4">
+              <h4 className="text-xl font-semibold text-blue-800 mb-4">
                 Outpatients vs. Inpatients
               </h4>
               <ResponsiveContainer width="100%" height={250}>
@@ -484,7 +485,7 @@ const AdminPage = () => {
             {/* Pie Charts */}
             <div className="grid grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 text-center">
-                <h4 className="text-base font-medium text-gray-600 mb-3">
+                <h4 className="text-base font-medium text-blue-800 mb-3">
                   Patient Type
                 </h4>
                 <ResponsiveContainer width="100%" height={200}>
@@ -505,7 +506,7 @@ const AdminPage = () => {
                 </ResponsiveContainer>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 text-center">
-                <h4 className="text-base font-medium text-gray-600 mb-3">
+                <h4 className="text-base font-medium text-blue-800 mb-3">
                   Gender Breakdown
                 </h4>
                 <ResponsiveContainer width="100%" height={200}>
@@ -521,7 +522,7 @@ const AdminPage = () => {
                       {genderData.map((entry, idx) => (
                         <Cell
                           key={idx}
-                          fill={idx === 0 ? "#0d9488" : "#34d399"}
+                          fill={COLORS[idx]}
                         />
                       ))}
                     </Pie>
