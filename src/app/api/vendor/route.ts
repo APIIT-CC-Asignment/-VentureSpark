@@ -53,7 +53,7 @@ export async function GET() {
     if (!Array.isArray(rows)) {
       return NextResponse.json([], { status: 200 }); // ✅ Ensure it's always an array
     }
-    
+
     return NextResponse.json(rows); // ✅ guaranteed to be an array
   } catch (error) {
     console.error("Error fetching vendors:", error);
