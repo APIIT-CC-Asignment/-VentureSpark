@@ -23,8 +23,12 @@ function HeaderContent() {
   const handleLogout = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("token");
+      localStorage.removeItem("typegroup");
+      localStorage.removeItem("name");
+      localStorage.removeItem("username");
       localStorage.removeItem("email");
       localStorage.removeItem("image");
+      localStorage.removeItem("nextauth.message")
 
       setEmail(null);
       setImage(null);

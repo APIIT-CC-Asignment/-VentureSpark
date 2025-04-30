@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 const jwt = require("jsonwebtoken");
-import pool from "../../lib/db";  
+import pool from "../../lib/db";
 
 export async function POST(req: Request) {
   try {
@@ -20,21 +20,36 @@ export async function POST(req: Request) {
 
     const user = rows[0];
 
-    // Compare password directly (not secure)
     if (password !== user.password) {
       return NextResponse.json({ message: "Invalid email or password" }, { status: 401 });
     }
 
-    const secret = process.env.JWT_SECRET || "mytemporarysecret"; // Use a fallback secret
+    const secret = process.env.JWT_SECRET || "mytemporarysecret";
 
-const token = jwt.sign(
-  { userId: user.id, email: user.email },
-  secret,  
-  { expiresIn: "1h" }
-);
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        typegroup: user.typegroup,
+        username: user.username,
+        name: user.name || "",
+        image: user.image || "",
+      },
+      secret,
+      { expiresIn: "1h" }
+    );
 
-
-    return NextResponse.json({ message: "Login successful", token });
+    return NextResponse.json({
+      message: "Login successful",
+      token,
+      user: {
+        email: user.email,
+        username: user.username,
+        name: user.name || "",
+        typegroup: user.typegroup || "",
+        image: user.image || "",
+      }
+    });
   } catch (error) {
     console.error("Login Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

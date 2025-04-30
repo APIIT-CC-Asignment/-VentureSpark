@@ -6,6 +6,8 @@ import { NextAuthOptions, Session } from "next-auth";
 declare module "next-auth" {
   interface Session {
     user: {
+      username: string;
+      typegroup: string;
       id: string;
       name?: string | null;
       email?: string | null;
@@ -31,6 +33,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.sub!;
         session.user.email = token.email || null;
+        session.user.typegroup = (token.typegroup as string) || '';
+        session.user.username = (token.username as string) || '';
         session.user.name = token.name || null;
         session.user.image = token.picture || null;
       }

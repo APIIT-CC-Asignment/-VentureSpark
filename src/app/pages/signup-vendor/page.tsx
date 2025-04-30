@@ -43,7 +43,7 @@ export default function Signup() {
   if (response.ok) {
     setStatus("Registration successful!");
     alert("Registration successful!");
-    router.push("/pages/vendordetails");
+    router.push("/pages/loginpage");
     setFormData({ username: "", email: "", password: "", message: "" });
   } else {
     if (response.status === 409) {

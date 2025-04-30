@@ -104,8 +104,7 @@ export default function VendorDetails() {
     
   return (
     <div>
-      <HeaderContent />
-    
+      
       <div className="flex flex-col md:flex-row gap-6 items-stretch justify-center bg-gray-100 px-4 py-24">
         <div className="w-full md:w-1/2 p-6 bg-white rounded-lg shadow-md flex flex-col mt-8 md:mt-0">
           <h1 className="text-2xl md:text-3xl font-bold mb-4 font-Positivus text-black">
@@ -286,7 +285,7 @@ export default function VendorDetails() {
           </form>
         </div>
       </div>
-      <FooterContent />
+     
     </div>
   );
 }

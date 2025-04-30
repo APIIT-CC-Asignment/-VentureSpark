@@ -13,9 +13,9 @@ function MenuLink({ mobile = false }) {
       <MenuItem linktext="Resources" linkurl="/pages/resources" mobile={mobile} />
 
       
-      <MenuItem linktext="Registation" linkurl="/pages/vendordetails" mobile={mobile} 
+      {/* <MenuItem linktext="Registation" linkurl="/pages/vendordetails" mobile={mobile} 
       
-      />
+      /> */}
     </nav>
   );
 }

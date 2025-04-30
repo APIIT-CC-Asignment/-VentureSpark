@@ -22,13 +22,15 @@ export default function LoginPage() {
       const session = await getSession();
       if (session) {
         localStorage.setItem("email", session.user?.email || "");
-        localStorage.setItem("name", session.user?.name || "");
+        localStorage.setItem("username", session.user?.username || "");
         localStorage.setItem("image", session.user?.image || "");
       }
     };
 
     fetchSession();
   }, []);
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +49,16 @@ export default function LoginPage() {
         setStatus("Login successful!");
         localStorage.setItem("token", data.token);
         localStorage.setItem("email", formData.email);
-        router.push("/");
+        localStorage.setItem("username", data.user.username);
+        localStorage.setItem("typegroup", data.user.typegroup);
+
+          if (data.user.typegroup === "Admin") {
+          router.push("/pages/admin");
+        } else if (data.user.typegroup === "vendor") {
+          router.push("/pages/vendordetails");
+        } else {
+          router.push("/");
+        }
       } else {
         setStatus(`Error: ${data.message}`);
       }
