@@ -1,5 +1,3 @@
-// components/MonthlyStatsBarChart.tsx
-
 'use client';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -14,7 +12,6 @@ type Props = {
 };
 
 export default function MonthlyStatsBarChart({ data }: Props) {
-  // Transform the API data to Recharts format
   const chartData = data.labels.map((label, i) => ({
     month: label,
     Users: data.users[i],

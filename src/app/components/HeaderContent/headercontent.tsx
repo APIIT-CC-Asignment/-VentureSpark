@@ -105,7 +105,7 @@ function HeaderContent() {
                 whileTap={{ scale: 0.95 }}
                 transition={{ duration: 0.2 }}
                 ref={profileRef}
-                onClick={toggleDropdown} // Toggle dropdown visibility on click
+                onClick={toggleDropdown}
               >
                 <img
                   src={image || "/default-avatar.png"}

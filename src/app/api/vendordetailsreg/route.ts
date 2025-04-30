@@ -38,8 +38,8 @@ export async function POST(req: { json: () => Promise<{ service_name: string; ye
     const selectedServicesString = JSON.stringify(selected_services);
 
     await db.query(
-      "INSERT INTO Vendor (service_name, years_of_excellence, email, contact_number, address, selected_services, type, expertise_in) VALUES (?, ?, ?, ?, ?, ?, ?,?)",
-      [service_name, years_of_excellence, email, contact_number, address, selectedServicesString, type, expertise_in]
+      "INSERT INTO Vendor (service_name, years_of_excellence, email, contact_number, address, selected_services, type, expertise_in,status) VALUES (?, ?, ?, ?, ?, ?, ?,?)",
+      [service_name, years_of_excellence, email, contact_number, address, selectedServicesString, type, expertise_in, "pending"]
     );
 
     // Return a success message

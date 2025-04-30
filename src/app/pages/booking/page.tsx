@@ -476,7 +476,7 @@ useEffect(() => {
               value={name || ""}
               onChange={handleChange}
               className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
-              required
+             
             />
           </div>
 

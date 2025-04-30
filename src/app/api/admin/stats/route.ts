@@ -4,16 +4,19 @@ import pool from '../../../lib/db';
 
 export async function GET() {
   try {
-    const [usersResult, servicesResult, bookingsResult, activeUsersResult] = await Promise.all([
+    const [usersResult, servicesResult, bookingsResult, activeUsersResult,pendingBookingsResult] = await Promise.all([
       pool.query<RowDataPacket[]>('SELECT COUNT(*) AS totalUsers FROM Users WHERE typegroup <> "Admin"'),
       pool.query<RowDataPacket[]>('SELECT COUNT(*) AS totalServices FROM Vendor'),
-      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS totalBookings FROM booking'),
+      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS totalBookings FROM booking '),
       pool.query<RowDataPacket[]>('SELECT COUNT(*) AS activeUsers FROM Users'),
+      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS pendingBookings FROM booking WHERE status = "pending"'),
     ]);
 
     const totalUsers = usersResult[0][0].totalUsers;
     const totalServices = servicesResult[0][0].totalServices;
     const totalBookings = bookingsResult[0][0].totalBookings;
+    const activeUsers = activeUsersResult[0][0].activeUsers;
+    const pendingBookings = pendingBookingsResult[0][0].pendingBookings ;
 
     const [monthlyStatsResult] = await pool.query<RowDataPacket[]>(`
       SELECT 
@@ -72,6 +75,7 @@ export async function GET() {
       monthlyData,
       serviceDistribution,
       recentBookings,
+      pendingBookings,
     };
 
     return NextResponse.json(stats, { status: 200 });
