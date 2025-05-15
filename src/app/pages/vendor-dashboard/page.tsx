@@ -110,6 +110,298 @@ const VendorDashboard: React.FC = () => {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
+  // Availability Manager Component
+  const AvailabilityManager: React.FC<{ vendorId: string | number }> = ({ vendorId }) => {
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [timeSlots, setTimeSlots] = useState<string[]>([]);
+    const [sessionDuration, setSessionDuration] = useState(30);
+    const [isLoading, setIsLoading] = useState(false);
+    const [availabilities, setAvailabilities] = useState<any[]>([]);
+    const [feedback, setFeedback] = useState({ type: '', message: '' });
+
+    // Load existing availabilities
+    useEffect(() => {
+      fetchAvailabilities();
+    }, [vendorId]);
+
+    const fetchAvailabilities = async () => {
+      try {
+        const response = await fetch(`/api/vendor-availability?vendorId=${vendorId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailabilities(data);
+        }
+      } catch (error) {
+        console.error('Error fetching availabilities:', error);
+      }
+    };
+
+    // Generate time slots for a day
+    const generateTimeSlots = () => {
+      const slots = [];
+      for (let hour = 8; hour <= 20; hour++) {
+        for (let minute = 0; minute < 60; minute += sessionDuration) {
+          const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          slots.push(time);
+        }
+      }
+      return slots;
+    };
+
+    // Add time slot
+    const addTimeSlot = (time: string) => {
+      if (!timeSlots.includes(time)) {
+        setTimeSlots([...timeSlots, time].sort());
+      }
+    };
+
+    // Remove time slot
+    const removeTimeSlot = (time: string) => {
+      setTimeSlots(timeSlots.filter(slot => slot !== time));
+    };
+
+    // Save availability
+    const saveAvailability = async () => {
+      if (timeSlots.length === 0) {
+        setFeedback({ type: 'error', message: 'Please select at least one time slot' });
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        // Convert time slots to full datetime
+        const availabilitySlots = timeSlots.map(time => {
+          const [hours, minutes] = time.split(':').map(Number);
+          const startTime = new Date(selectedDate);
+          startTime.setHours(hours, minutes, 0, 0);
+
+          const endTime = new Date(startTime);
+          endTime.setMinutes(endTime.getMinutes() + sessionDuration);
+
+          return {
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString()
+          };
+        });
+
+        const response = await fetch('/api/vendor-availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vendorId,
+            availabilitySlots
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setFeedback({ type: 'success', message: result.message });
+          setTimeSlots([]);
+          await fetchAvailabilities();
+        } else {
+          const error = await response.json();
+          setFeedback({ type: 'error', message: error.error });
+        }
+      } catch (error) {
+        setFeedback({ type: 'error', message: 'Failed to save availability' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Delete availability
+    const deleteAvailability = async (slotId: string) => {
+      try {
+        const response = await fetch(`/api/vendor-availability?slotId=${slotId}&vendorId=${vendorId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          setFeedback({ type: 'success', message: 'Availability slot removed' });
+          await fetchAvailabilities();
+        } else {
+          const error = await response.json();
+          setFeedback({ type: 'error', message: error.error });
+        }
+      } catch (error) {
+        setFeedback({ type: 'error', message: 'Failed to remove availability' });
+      }
+    };
+
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+
+    const formatDateTime = (dateTime: string) => {
+      return new Date(dateTime).toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+          <h2 className="text-3xl font-bold text-black mb-2">Manage Your Availability</h2>
+          <p className="text-gray-600 text-lg">Set when you're available for client sessions</p>
+        </div>
+
+        {/* Feedback */}
+        {feedback.message && (
+          <div
+            className={`p-4 rounded-xl border ${feedback.type === 'error'
+              ? 'bg-red-50 text-red-800 border-red-200'
+              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              } animate-fadeIn shadow-sm`}
+          >
+            <div className="flex items-center">
+              {feedback.type === 'error' ? (
+                <XCircleIcon className="w-5 h-5 mr-2" />
+              ) : (
+                <CheckCircleIcon className="w-5 h-5 mr-2" />
+              )}
+              <span className="font-medium">{feedback.message}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - Add Availability */}
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+            <h3 className="text-xl font-bold text-black mb-6">Add New Availability</h3>
+
+            {/* Session Duration */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-black mb-2">Session Duration (minutes)</label>
+              <select
+                value={sessionDuration}
+                onChange={(e) => setSessionDuration(Number(e.target.value))}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent"
+              >
+                <option value={15}>15 minutes</option>
+                <option value={30}>30 minutes</option>
+                <option value={45}>45 minutes</option>
+                <option value={60}>60 minutes</option>
+                <option value={90}>90 minutes</option>
+                <option value={120}>2 hours</option>
+              </select>
+            </div>
+
+            {/* Date Picker */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-black mb-2">Select Date</label>
+              <input
+                type="date"
+                value={selectedDate.toISOString().split('T')[0]}
+                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent"
+              />
+              <p className="text-sm text-gray-600 mt-1">{formatDate(selectedDate)}</p>
+            </div>
+
+            {/* Time Slots */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-black mb-3">Select Time Slots</label>
+              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                {generateTimeSlots().map(time => (
+                  <button
+                    key={time}
+                    onClick={() => timeSlots.includes(time) ? removeTimeSlot(time) : addTimeSlot(time)}
+                    className={`p-2 rounded-lg text-sm font-medium transition-all ${timeSlots.includes(time)
+                      ? 'bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black shadow-lg'
+                      : 'bg-gray-100 text-black hover:bg-gray-200'
+                      }`}
+                  >
+                    {time}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Selected Slots */}
+            {timeSlots.length > 0 && (
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-black mb-2">Selected Slots</label>
+                <div className="flex flex-wrap gap-2">
+                  {timeSlots.map(time => (
+                    <span
+                      key={time}
+                      className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black text-sm font-medium rounded-full"
+                    >
+                      {time}
+                      <button
+                        onClick={() => removeTimeSlot(time)}
+                        className="ml-2 hover:bg-black hover:bg-opacity-10 rounded-full p-1"
+                      >
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Save Button */}
+            <button
+              onClick={saveAvailability}
+              disabled={isLoading || timeSlots.length === 0}
+              className="w-full py-3 bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black font-semibold rounded-lg hover:opacity-90 disabled:opacity-50 shadow-lg"
+            >
+              {isLoading ? 'Saving...' : 'Save Availability'}
+            </button>
+          </div>
+
+          {/* Right Column - Current Availability */}
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+            <h3 className="text-xl font-bold text-black mb-6">Current Availability</h3>
+
+            {availabilities.length === 0 ? (
+              <div className="text-center py-12">
+                <CalendarIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h4 className="text-lg font-semibold text-black mb-2">No availability set</h4>
+                <p className="text-gray-600">Add your availability to start receiving bookings</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {availabilities.map((slot) => (
+                  <div
+                    key={slot.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-black">
+                        {formatDateTime(slot.start_time)} - {formatDateTime(slot.end_time)}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {Math.round((new Date(slot.end_time).getTime() - new Date(slot.start_time).getTime()) / (1000 * 60))} minutes
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => deleteAvailability(slot.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <XIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Check for authentication on component mount
   useEffect(() => {
     const storedAuth = localStorage.getItem('vendorAuth');
@@ -781,20 +1073,7 @@ const VendorDashboard: React.FC = () => {
           )}
 
           {/* Enhanced Availability Tab */}
-          {activeTab === 'availability' && (
-            <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-              <h2 className="text-3xl font-bold text-black mb-6">Set Your Availability</h2>
-              <div className="text-center py-16">
-                <div className="w-24 h-24 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CalendarIcon className="w-12 h-12 text-blue-600" />
-                </div>
-                <h3 className="text-2xl font-bold text-black mb-3">Coming Soon</h3>
-                <p className="text-gray-600 text-lg">
-                  Availability management will be available in the next update.
-                </p>
-              </div>
-            </div>
-          )}
+          {activeTab === 'availability' && <AvailabilityManager vendorId={auth.vendorId} />}
 
           {/* Enhanced Sessions Tab */}
           {activeTab === 'sessions' && (
