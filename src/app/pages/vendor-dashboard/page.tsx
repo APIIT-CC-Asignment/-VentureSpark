@@ -47,6 +47,20 @@ interface VendorBasicInfo {
   expertise_in: string;
 }
 
+interface AvailabilitySlot {
+  id: string;
+  vendor_id: string | number;
+  start_time: string;
+  end_time: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface GroupedAvailability {
+  date: string;
+  slots: AvailabilitySlot[];
+}
+
 interface VendorProfile {
   id: number | string;
   vendor_id: number | string;
@@ -70,6 +84,12 @@ interface AuthState {
   isAuthenticated: boolean;
   vendorId: string | number;
   email: string;
+}
+
+// Add type definition for feedback
+interface FeedbackState {
+  type: 'success' | 'error' | 'info' | '';
+  message: string;
 }
 
 const sidebarItems = [
@@ -98,7 +118,7 @@ const VendorDashboard: React.FC = () => {
   // UI states
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState({ type: '', message: '' });
+  const [feedback, setFeedback] = useState<FeedbackState>({ type: '', message: '' });
   const [dataLoaded, setDataLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -110,29 +130,115 @@ const VendorDashboard: React.FC = () => {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
+  // Add formatDateTime function
+  const formatDateTime = (dateTime: string) => {
+    try {
+      if (!dateTime) return 'Invalid date/time';
+
+      const date = new Date(dateTime);
+
+      if (isNaN(date.getTime())) return 'Invalid date/time';
+
+      return date.toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid date/time';
+    }
+  };
+
   // Availability Manager Component
   const AvailabilityManager: React.FC<{ vendorId: string | number }> = ({ vendorId }) => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [timeSlots, setTimeSlots] = useState<string[]>([]);
     const [sessionDuration, setSessionDuration] = useState(30);
     const [isLoading, setIsLoading] = useState(false);
-    const [availabilities, setAvailabilities] = useState<any[]>([]);
-    const [feedback, setFeedback] = useState({ type: '', message: '' });
+    const [availabilities, setAvailabilities] = useState<AvailabilitySlot[]>([]);
+    const [feedback, setFeedback] = useState<FeedbackState>({ type: '', message: '' });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage] = useState(10);
+    const [lastFetchTime, setLastFetchTime] = useState(0);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    // Load existing availabilities
+    // Feedback timeout to automatically clear feedback messages
     useEffect(() => {
-      fetchAvailabilities();
-    }, [vendorId]);
+      if (feedback.message) {
+        const timer = setTimeout(() => {
+          setFeedback({ type: '', message: '' });
+        }, 3000); // Clear feedback after 3 seconds
+
+        return () => clearTimeout(timer);
+      }
+    }, [feedback]);
+
+    // Load existing availabilities - with throttling to prevent excessive calls
+    useEffect(() => {
+      if (vendorId && !isLoading && !isDeleting) {
+        // Prevent excessive API calls by checking if we've fetched recently
+        const now = Date.now();
+        if (now - lastFetchTime > 5000) { // Only fetch if it's been more than 5 seconds
+          fetchAvailabilities();
+          setLastFetchTime(now);
+        }
+      }
+    }, [vendorId, isLoading, isDeleting, lastFetchTime]);
 
     const fetchAvailabilities = async () => {
       try {
-        const response = await fetch(`/api/vendor-availability?vendorId=${vendorId}`);
+        // Using encodeURIComponent to safely handle special characters in vendorId
+        const encodedVendorId = encodeURIComponent(String(vendorId));
+
+        const response = await fetch(`/api/vendor-availability?vendorId=${encodedVendorId}`);
+
         if (response.ok) {
           const data = await response.json();
-          setAvailabilities(data);
+
+          if (data && Array.isArray(data)) {
+            // Process the data to ensure date fields are properly formatted
+            const processedData = data.map(slot => {
+              try {
+                // Create new objects with ensured date formatting
+                return {
+                  ...slot,
+                  // Ensure date fields are properly parsed
+                  start_time: new Date(slot.start_time).toISOString(),
+                  end_time: new Date(slot.end_time).toISOString(),
+                };
+              } catch (error) {
+                // Return the original slot if there's an error
+                return slot;
+              }
+            }).filter(slot => {
+              // Filter out any slots with invalid dates
+              try {
+                return !isNaN(new Date(slot.start_time).getTime()) &&
+                  !isNaN(new Date(slot.end_time).getTime());
+              } catch (e) {
+                return false;
+              }
+            });
+
+            // Sort slots by start time
+            processedData.sort((a, b) =>
+              new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+            );
+
+            setAvailabilities(processedData);
+
+            // Set current page to 1 when data changes
+            setCurrentPage(1);
+          } else {
+            setAvailabilities([]);
+          }
+        } else {
+          setAvailabilities([]);
         }
       } catch (error) {
-        console.error('Error fetching availabilities:', error);
+        setAvailabilities([]);
       }
     };
 
@@ -197,6 +303,9 @@ const VendorDashboard: React.FC = () => {
           const result = await response.json();
           setFeedback({ type: 'success', message: result.message });
           setTimeSlots([]);
+          // Force refresh of availability data
+          const now = Date.now();
+          setLastFetchTime(now - 6000); // Ensures a fetch will happen on next render
           await fetchAvailabilities();
         } else {
           const error = await response.json();
@@ -209,42 +318,180 @@ const VendorDashboard: React.FC = () => {
       }
     };
 
-    // Delete availability
+    // Delete availability with fixed handling
     const deleteAvailability = async (slotId: string) => {
+      if (isDeleting) return; // Prevent concurrent deletion requests
+
+      setIsDeleting(true);
       try {
-        const response = await fetch(`/api/vendor-availability?slotId=${slotId}&vendorId=${vendorId}`, {
+        // Convert vendorId to string to ensure proper encoding
+        const encodedVendorId = encodeURIComponent(String(vendorId));
+        const encodedSlotId = encodeURIComponent(slotId);
+
+        const response = await fetch(`/api/vendor-availability?slotId=${encodedSlotId}&vendorId=${encodedVendorId}`, {
           method: 'DELETE'
         });
 
         if (response.ok) {
           setFeedback({ type: 'success', message: 'Availability slot removed' });
-          await fetchAvailabilities();
+          // Update the availability list directly without refetching
+          setAvailabilities(current => current.filter(slot => slot.id !== slotId));
         } else {
           const error = await response.json();
-          setFeedback({ type: 'error', message: error.error });
+          setFeedback({ type: 'error', message: error.error || 'Failed to delete slot' });
         }
       } catch (error) {
         setFeedback({ type: 'error', message: 'Failed to remove availability' });
+      } finally {
+        setIsDeleting(false);
+        // Force data refresh
+        setTimeout(() => {
+          const now = Date.now();
+          setLastFetchTime(now - 6000);
+        }, 300);
       }
     };
 
     const formatDate = (date: Date) => {
-      return date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+      try {
+        return date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      } catch (error) {
+        return 'Invalid date';
+      }
     };
 
-    const formatDateTime = (dateTime: string) => {
-      return new Date(dateTime).toLocaleString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+    const formatDateOnly = (dateTime: string) => {
+      try {
+        if (!dateTime) return 'Invalid date';
+
+        const date = new Date(dateTime);
+
+        if (isNaN(date.getTime())) return 'Invalid date';
+
+        return date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      } catch (error) {
+        return 'Invalid date';
+      }
+    };
+
+    const formatTimeOnly = (dateTime: string) => {
+      try {
+        if (!dateTime) return 'Invalid time';
+
+        const date = new Date(dateTime);
+
+        if (isNaN(date.getTime())) return 'Invalid time';
+
+        return date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      } catch (error) {
+        return 'Invalid time';
+      }
+    };
+
+    // Group availabilities by date - optimized and with better error handling
+    const groupAvailabilitiesByDate = (): GroupedAvailability[] => {
+      if (!availabilities || availabilities.length === 0) {
+        return [];
+      }
+
+      try {
+        // Create a map to group slots by date
+        const groupedMap: Record<string, AvailabilitySlot[]> = {};
+
+        // Process each slot and group by date
+        availabilities.forEach(slot => {
+          try {
+            // Format date as YYYY-MM-DD for consistent grouping
+            const dateObj = new Date(slot.start_time);
+            if (isNaN(dateObj.getTime())) {
+              return; // Skip this slot
+            }
+
+            const dateStr = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+            if (!groupedMap[dateStr]) {
+              groupedMap[dateStr] = [];
+            }
+
+            groupedMap[dateStr].push(slot);
+          } catch (error) {
+            // Skip slots with errors
+          }
+        });
+
+        // Sort slots within each group by start time
+        Object.keys(groupedMap).forEach(date => {
+          groupedMap[date].sort((a, b) =>
+            new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+          );
+        });
+
+        // Convert map to array and sort by date
+        return Object.entries(groupedMap)
+          .map(([date, slots]) => ({ date, slots }))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      } catch (error) {
+        return [];
+      }
+    };
+
+    // Pagination logic - simplified
+    const groupedAvailabilities = groupAvailabilitiesByDate();
+    const totalPages = Math.ceil(groupedAvailabilities.length / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const paginatedData = groupedAvailabilities.slice(startIndex, endIndex);
+
+    const goToNextPage = () => {
+      if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    };
+
+    const goToPrevPage = () => {
+      if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
+
+    // Clear multiple slots by date
+    const clearDaySlots = async (slotsToDelete: AvailabilitySlot[]) => {
+      if (isDeleting || !slotsToDelete.length) return;
+
+      setIsDeleting(true);
+      setFeedback({ type: 'info', message: 'Deleting availability slots...' });
+
+      try {
+        // Delete slots sequentially to avoid race conditions
+        for (const slot of slotsToDelete) {
+          await deleteAvailability(slot.id);
+        }
+
+        setFeedback({ type: 'success', message: 'Successfully cleared all slots for selected day' });
+
+        // Update local state without another API call
+        const slotIds = new Set(slotsToDelete.map(slot => slot.id));
+        setAvailabilities(current => current.filter(slot => !slotIds.has(slot.id)));
+      } catch (error) {
+        setFeedback({ type: 'error', message: 'Failed to clear all slots' });
+      } finally {
+        setIsDeleting(false);
+        // Force data refresh
+        setTimeout(() => {
+          const now = Date.now();
+          setLastFetchTime(now - 6000);
+        }, 300);
+      }
     };
 
     return (
@@ -260,12 +507,16 @@ const VendorDashboard: React.FC = () => {
           <div
             className={`p-4 rounded-xl border ${feedback.type === 'error'
               ? 'bg-red-50 text-red-800 border-red-200'
-              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : feedback.type === 'info'
+                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
               } animate-fadeIn shadow-sm`}
           >
             <div className="flex items-center">
               {feedback.type === 'error' ? (
                 <XCircleIcon className="w-5 h-5 mr-2" />
+              ) : feedback.type === 'info' ? (
+                <AlertCircleIcon className="w-5 h-5 mr-2" />
               ) : (
                 <CheckCircleIcon className="w-5 h-5 mr-2" />
               )}
@@ -361,9 +612,16 @@ const VendorDashboard: React.FC = () => {
             </button>
           </div>
 
-          {/* Right Column - Current Availability */}
+          {/* Right Column - Current Availability Table */}
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-xl font-bold text-black mb-6">Current Availability</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-black">Current Availability</h3>
+              {groupedAvailabilities.length > 0 && (
+                <div className="text-sm text-gray-600">
+                  Total: {availabilities.length} sessions across {groupedAvailabilities.length} days
+                </div>
+              )}
+            </div>
 
             {availabilities.length === 0 ? (
               <div className="text-center py-12">
@@ -372,28 +630,130 @@ const VendorDashboard: React.FC = () => {
                 <p className="text-gray-600">Add your availability to start receiving bookings</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {availabilities.map((slot) => (
-                  <div
-                    key={slot.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-black">
-                        {formatDateTime(slot.start_time)} - {formatDateTime(slot.end_time)}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        {Math.round((new Date(slot.end_time).getTime() - new Date(slot.start_time).getTime()) / (1000 * 60))} minutes
-                      </p>
+              <div className="space-y-4">
+                {/* Table */}
+                <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-black uppercase tracking-wider border-b border-gray-200">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-black uppercase tracking-wider border-b border-gray-200">
+                          Time Slots
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-black uppercase tracking-wider border-b border-gray-200">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {paginatedData.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-4 text-center text-sm text-gray-500">
+                            No availability slots to display for the current page
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedData.map((dayData, index) => {
+                          // Extra safety check to ensure dayData has slots
+                          if (!dayData.slots || dayData.slots.length === 0) {
+                            console.log('Zuhri: Empty day data found:', dayData);
+                            return null;
+                          }
+
+                          return (
+                            <tr key={index} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-4 whitespace-nowrap border-b border-gray-100">
+                                <div className="text-sm font-semibold text-black">
+                                  {formatDateOnly(dayData.slots[0].start_time)}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">
+                                  {dayData.slots.length} session{dayData.slots.length > 1 ? 's' : ''}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 border-b border-gray-100">
+                                <div className="flex flex-wrap gap-2">
+                                  {dayData.slots.map((slot: AvailabilitySlot) => (
+                                    <div
+                                      key={slot.id}
+                                      className="inline-flex items-center group"
+                                    >
+                                      <span className="bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black text-xs font-medium px-3 py-1 rounded-full">
+                                        {formatTimeOnly(slot.start_time)} - {formatTimeOnly(slot.end_time)}
+                                      </span>
+                                      <button
+                                        onClick={() => deleteAvailability(slot.id)}
+                                        className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"
+                                        title="Delete this slot"
+                                      >
+                                        <XIcon className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-right border-b border-gray-100">
+                                <button
+                                  onClick={() => {
+                                    // Delete all slots for this date
+                                    clearDaySlots(dayData.slots);
+                                  }}
+                                  className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors text-xs font-medium"
+                                  title="Delete all slots for this date"
+                                >
+                                  Clear Day
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      Showing {startIndex + 1} to {Math.min(endIndex, groupedAvailabilities.length)} of {groupedAvailabilities.length} days
                     </div>
-                    <button
-                      onClick={() => deleteAvailability(slot.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <XIcon className="w-4 h-4" />
-                    </button>
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={goToPrevPage}
+                        disabled={currentPage === 1}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeftIcon className="w-4 h-4" />
+                      </button>
+
+                      <div className="flex space-x-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                              ? 'bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black'
+                              : 'border border-gray-300 text-black hover:bg-gray-50'
+                              }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRightIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
@@ -447,6 +807,7 @@ const VendorDashboard: React.FC = () => {
   // Load data after authentication
   useEffect(() => {
     if (auth.isAuthenticated && auth.vendorId) {
+      console.log('Auth state when loading data:', auth); // Debug log
       loadVendorData();
     }
   }, [auth.isAuthenticated, auth.vendorId]);
@@ -570,24 +931,6 @@ const VendorDashboard: React.FC = () => {
       case 'verified':
         return (
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <CheckCircleIcon className="w-4 h-4 mr-1" />
-              Verified
-            </span>
-          </div>
-        );
-      case 'rejected':
-        return (
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
-              <XCircleIcon className="w-4 h-4 mr-1" />
-              Verification Failed
-            </span>
-          </div>
-        );
-      default:
-        return (
-          <div className="flex items-center gap-2">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
               <ClockIcon className="w-4 h-4 mr-1" />
               Pending Verification
@@ -648,6 +991,18 @@ const VendorDashboard: React.FC = () => {
     setIsEditing(false);
   };
 
+  const handleTabChange = (tab: string) => {
+    console.log(`Tab changed to: ${tab}, vendorId: ${auth.vendorId}`);
+    setActiveTab(tab);
+  };
+
+  // Effect to log when availability tab is activated
+  useEffect(() => {
+    if (activeTab === 'availability') {
+      console.log(`Availability tab activated with vendorId: ${auth.vendorId}`);
+    }
+  }, [activeTab, auth.vendorId]);
+
   if (!auth.isAuthenticated) {
     return null;
   }
@@ -692,7 +1047,7 @@ const VendorDashboard: React.FC = () => {
             {sidebarItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleTabChange(item.id)}
                 className={`w-full flex items-center p-4 rounded-xl transition-all duration-200 ${activeTab === item.id
                   ? 'bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black shadow-lg transform scale-105 font-semibold'
                   : 'text-black hover:bg-gray-100 hover:shadow-md'
@@ -782,12 +1137,16 @@ const VendorDashboard: React.FC = () => {
             <div
               className={`mb-6 p-4 rounded-xl border ${feedback.type === 'error'
                 ? 'bg-red-50 text-red-800 border-red-200'
-                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : feedback.type === 'info'
+                  ? 'bg-blue-50 text-blue-800 border-blue-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 } animate-fadeIn shadow-sm`}
             >
               <div className="flex items-center">
                 {feedback.type === 'error' ? (
                   <XCircleIcon className="w-5 h-5 mr-2" />
+                ) : feedback.type === 'info' ? (
+                  <AlertCircleIcon className="w-5 h-5 mr-2" />
                 ) : (
                   <CheckCircleIcon className="w-5 h-5 mr-2" />
                 )}
@@ -1073,7 +1432,11 @@ const VendorDashboard: React.FC = () => {
           )}
 
           {/* Enhanced Availability Tab */}
-          {activeTab === 'availability' && <AvailabilityManager vendorId={auth.vendorId} />}
+          {activeTab === 'availability' && (
+            <div key="availability-section">
+              <AvailabilityManager vendorId={auth.vendorId || auth.email} />
+            </div>
+          )}
 
           {/* Enhanced Sessions Tab */}
           {activeTab === 'sessions' && (
@@ -1104,24 +1467,6 @@ const VendorDashboard: React.FC = () => {
                     </div>
                     <h3 className="text-sm font-semibold text-black">Total Revenue</h3>
                     <p className="text-3xl font-bold text-black">$0</p>
-                    <p className="text-xs text-gray-600 mt-1 font-medium">This month</p>
-                  </div>
-
-                  <div className="text-center p-6 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200">
-                    <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
-                      <BarChart3Icon className="w-7 h-7 text-emerald-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-black">Sessions</h3>
-                    <p className="text-3xl font-bold text-black">0</p>
-                    <p className="text-xs text-gray-600 mt-1 font-medium">Completed</p>
-                  </div>
-
-                  <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
-                    <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
-                      <StarIcon className="w-7 h-7 text-purple-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-black">Rating</h3>
-                    <p className="text-3xl font-bold text-black">0.0</p>
                     <p className="text-xs text-gray-600 mt-1 font-medium">0 reviews</p>
                   </div>
 

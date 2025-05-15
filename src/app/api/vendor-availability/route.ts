@@ -14,9 +14,45 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
         }
 
+        console.log(`GET vendor-availability received request for vendorId: ${vendorId}`);
+
+        // Handle case where vendorId might be an email
+        let actualVendorId = vendorId;
+        if (typeof vendorId === 'string' && vendorId.includes('@')) {
+            // Get user ID from email
+            console.log(`Resolving email to vendorId: ${vendorId}`);
+            const [userRows] = await pool.execute<RowDataPacket[]>(
+                'SELECT id FROM users WHERE email = ? AND typegroup = ?',
+                [vendorId, 'vendor']
+            );
+
+            if (userRows && userRows.length > 0) {
+                actualVendorId = userRows[0].id;
+                console.log(`Resolved email to vendorId: ${actualVendorId}`);
+            } else {
+                console.log(`No vendor found with email: ${vendorId}`);
+
+                // IMPORTANT FIX: If email not found in users table, try direct lookup in Vendor table
+                const [vendorRows] = await pool.execute<RowDataPacket[]>(
+                    'SELECT id FROM Vendor WHERE email = ?',
+                    [vendorId]
+                );
+
+                if (vendorRows && vendorRows.length > 0) {
+                    actualVendorId = vendorRows[0].id;
+                    console.log(`Found vendor ID in Vendor table: ${actualVendorId}`);
+                } else {
+                    console.log(`Email ${vendorId} not found in Vendor table either`);
+                }
+            }
+        }
+
+        // Type check for debugging
+        console.log(`ActualVendorId type: ${typeof actualVendorId}, value: ${actualVendorId}`);
+
         // Get vendor's availability
-        const [rows] = await pool.execute<RowDataPacket[]>(
-            `SELECT 
+        console.log(`Executing SQL query for vendorId: ${actualVendorId}`);
+        const query = `SELECT 
         id,
         vendor_id,
         start_time,
@@ -25,9 +61,163 @@ export async function GET(req: NextRequest) {
         updated_at
       FROM vendor_availability 
       WHERE vendor_id = ? 
-      ORDER BY start_time ASC`,
-            [vendorId]
+      ORDER BY start_time ASC`;
+
+        console.log(`SQL Query: ${query}`);
+        console.log(`With parameter: ${actualVendorId}`);
+
+        const [rows] = await pool.execute<RowDataPacket[]>(
+            query,
+            [actualVendorId]
         );
+
+        console.log(`Found ${rows.length} availability slots for vendorId: ${actualVendorId}`);
+
+        // If zero rows returned but we know data exists, try alternative queries
+        if (rows.length === 0) {
+            console.log('No slots found. Trying alternative vendor ID formats...');
+
+            // Try with numeric conversion (some DBs store IDs as numbers)
+            if (!isNaN(Number(actualVendorId))) {
+                console.log(`Trying with numeric vendorId: ${Number(actualVendorId)}`);
+                const [numericRows] = await pool.execute<RowDataPacket[]>(
+                    query,
+                    [Number(actualVendorId)]
+                );
+
+                if (numericRows.length > 0) {
+                    console.log(`Found ${numericRows.length} slots with numeric vendorId!`);
+                    return NextResponse.json(numericRows);
+                }
+            }
+
+            // Try with string conversion
+            if (typeof actualVendorId !== 'string') {
+                const stringId = String(actualVendorId);
+                console.log(`Trying with string vendorId: ${stringId}`);
+                const [stringRows] = await pool.execute<RowDataPacket[]>(
+                    query,
+                    [stringId]
+                );
+
+                if (stringRows.length > 0) {
+                    console.log(`Found ${stringRows.length} slots with string vendorId!`);
+                    return NextResponse.json(stringRows);
+                }
+            }
+
+            // Last resort: Check if there might be other availability records using different vendor IDs
+            console.log('Trying to find the correct vendor ID from various tables...');
+
+            let alternativeIds: (string | number)[] = [];
+            let email = '';
+
+            if (typeof vendorId === 'string' && vendorId.includes('@')) {
+                email = vendorId;
+            } else {
+                // Try to get the email from the ID
+                try {
+                    const [userRow] = await pool.execute<RowDataPacket[]>(
+                        'SELECT email FROM users WHERE id = ?',
+                        [vendorId]
+                    );
+                    if (userRow && userRow.length > 0) {
+                        email = userRow[0].email;
+                        console.log(`Found email ${email} for vendorId ${vendorId}`);
+                    }
+                } catch (e) {
+                    console.log(`Error looking up email for ID ${vendorId}:`, e);
+                }
+            }
+
+            // Now gather all possible vendor IDs from different tables
+            if (email) {
+                try {
+                    // Find associated IDs with this email
+                    console.log(`Looking for vendor IDs associated with email: ${email}`);
+
+                    // Check users table
+                    const [userRows] = await pool.execute<RowDataPacket[]>(
+                        'SELECT id FROM users WHERE email = ?',
+                        [email]
+                    );
+                    if (userRows && userRows.length > 0) {
+                        userRows.forEach(row => {
+                            alternativeIds.push(row.id);
+                            console.log(`Found ID ${row.id} in users table`);
+                        });
+                    }
+
+                    // Check Vendor table
+                    const [vendorRows] = await pool.execute<RowDataPacket[]>(
+                        'SELECT id FROM Vendor WHERE email = ?',
+                        [email]
+                    );
+                    if (vendorRows && vendorRows.length > 0) {
+                        vendorRows.forEach(row => {
+                            if (!alternativeIds.includes(row.id)) {
+                                alternativeIds.push(row.id);
+                                console.log(`Found ID ${row.id} in Vendor table`);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.log('Error looking up alternative IDs:', e);
+                }
+            }
+
+            // Now try to find availability with any of these IDs
+            if (alternativeIds.length > 0) {
+                console.log(`Checking availability with ${alternativeIds.length} alternative IDs:`, alternativeIds);
+
+                for (const altId of alternativeIds) {
+                    try {
+                        const [altRows] = await pool.execute<RowDataPacket[]>(
+                            query,
+                            [altId]
+                        );
+
+                        if (altRows.length > 0) {
+                            console.log(`Found ${altRows.length} availability slots with alternative ID: ${altId}`);
+                            return NextResponse.json(altRows);
+                        }
+
+                        // Try with type conversion
+                        const numAltId = Number(altId);
+                        if (!isNaN(numAltId)) {
+                            const [numAltRows] = await pool.execute<RowDataPacket[]>(
+                                query,
+                                [numAltId]
+                            );
+
+                            if (numAltRows.length > 0) {
+                                console.log(`Found ${numAltRows.length} availability slots with numeric alternative ID: ${numAltId}`);
+                                return NextResponse.json(numAltRows);
+                            }
+                        }
+                    } catch (e) {
+                        console.log(`Error checking alternative ID ${altId}:`, e);
+                    }
+                }
+            }
+
+            // As a last attempt, just list all slots in the system (limited for safety)
+            console.log('No availability found with any known vendor ID. Retrieving sample available slots:');
+            const [allSlots] = await pool.execute<RowDataPacket[]>(
+                'SELECT id, vendor_id, start_time, end_time FROM vendor_availability ORDER BY created_at DESC LIMIT 20'
+            );
+
+            if (allSlots.length > 0) {
+                console.log(`Found ${allSlots.length} total slots in the system. Sample vendor_ids:`);
+                const vendorIds = new Set();
+                allSlots.forEach(slot => {
+                    vendorIds.add(slot.vendor_id);
+                });
+                console.log('Unique vendor_ids in the database:', Array.from(vendorIds));
+            } else {
+                console.log('No availability slots found in the entire system.');
+            }
+        }
 
         return NextResponse.json(rows);
     } catch (error) {
@@ -49,6 +239,7 @@ const formatDateForMySQL = (isoString: string): string => {
 export async function POST(req: NextRequest) {
     try {
         const { vendorId, availabilitySlots } = await req.json();
+        console.log(`POST vendor-availability received request for vendorId: ${vendorId}`);
 
         if (!vendorId || !availabilitySlots || !Array.isArray(availabilitySlots)) {
             return NextResponse.json(
@@ -63,6 +254,7 @@ export async function POST(req: NextRequest) {
 
         if (typeof vendorId === 'string' && vendorId.includes('@')) {
             // Get user ID from email
+            console.log(`Resolving email to vendorId: ${vendorId}`);
             const [userRows] = await pool.execute<RowDataPacket[]>(
                 'SELECT id, email FROM users WHERE email = ? AND typegroup = ?',
                 [vendorId, 'vendor']
@@ -77,8 +269,10 @@ export async function POST(req: NextRequest) {
 
             actualVendorId = userRows[0].id;
             vendorEmail = userRows[0].email;
+            console.log(`Resolved email to vendorId: ${actualVendorId}, type: ${typeof actualVendorId}`);
         } else {
             // Get email from user ID
+            console.log(`Looking up email for vendorId: ${vendorId}`);
             const [userRows] = await pool.execute<RowDataPacket[]>(
                 'SELECT email FROM users WHERE id = ? AND typegroup = ?',
                 [actualVendorId, 'vendor']
@@ -92,9 +286,11 @@ export async function POST(req: NextRequest) {
             }
 
             vendorEmail = userRows[0].email;
+            console.log(`Found email: ${vendorEmail} for vendorId: ${actualVendorId}`);
         }
 
         // Now check for existing vendor record with comprehensive search
+        console.log(`Checking for existing vendor with id: ${actualVendorId} or email: ${vendorEmail}`);
         const [existingVendor] = await pool.execute<RowDataPacket[]>(
             'SELECT id, email FROM Vendor WHERE id = ? OR email = ?',
             [actualVendorId, vendorEmail]
@@ -102,6 +298,7 @@ export async function POST(req: NextRequest) {
 
         if (!existingVendor || existingVendor.length === 0) {
             // No vendor exists, create one
+            console.log(`No vendor found, creating new vendor record`);
             const [userDetails] = await pool.execute<RowDataPacket[]>(
                 'SELECT email, username FROM users WHERE id = ? AND typegroup = ?',
                 [actualVendorId, 'vendor']
@@ -115,6 +312,7 @@ export async function POST(req: NextRequest) {
             }
 
             // Use INSERT ... ON DUPLICATE KEY UPDATE to handle any remaining conflicts
+            console.log(`Creating vendor with id: ${actualVendorId}, email: ${userDetails[0].email}`);
             await pool.execute<OkPacket>(
                 `INSERT INTO Vendor 
          (id, email, service_name, years_of_excellence, contact_number, address, selected_services, type, active, expertise_in, created_at, updated_at) 
@@ -137,11 +335,16 @@ export async function POST(req: NextRequest) {
             );
         } else {
             // Vendor exists, ensure we're using the correct ID
+            console.log(`Found existing vendor: `, existingVendor[0]);
             if (existingVendor[0].id !== actualVendorId) {
+                console.log(`ID mismatch! Updating from ${actualVendorId} to ${existingVendor[0].id}`);
                 // There's a mismatch, use the existing vendor's ID to avoid conflicts
                 actualVendorId = existingVendor[0].id;
             }
         }
+
+        // At this point, we have the correct vendor ID
+        console.log(`Final actualVendorId for insert: ${actualVendorId}, type: ${typeof actualVendorId}`);
 
         // Validate each slot
         for (const slot of availabilitySlots) {
@@ -210,11 +413,47 @@ export async function POST(req: NextRequest) {
             const startTime = formatDateForMySQL(slot.startTime);
             const endTime = formatDateForMySQL(slot.endTime);
 
+            // Ensure vendorId is consistently stored as the same type
+            // Try to detect if the database stores it as numeric or string
+            // by checking existing records
+            let vendorIdToStore = actualVendorId;
+
+            try {
+                // Check existing record's type
+                const [sample] = await pool.execute<RowDataPacket[]>(
+                    'SELECT vendor_id FROM vendor_availability LIMIT 1'
+                );
+
+                if (sample && sample.length > 0) {
+                    console.log(`Sample vendor_id from database: ${sample[0].vendor_id} (${typeof sample[0].vendor_id})`);
+
+                    // If database stores as number but our ID is string
+                    if (typeof sample[0].vendor_id === 'number' && typeof vendorIdToStore !== 'number') {
+                        const numId = Number(vendorIdToStore);
+                        if (!isNaN(numId)) {
+                            console.log(`Converting vendorId to number: ${numId}`);
+                            vendorIdToStore = numId;
+                        }
+                    }
+
+                    // If database stores as string but our ID is number
+                    if (typeof sample[0].vendor_id === 'string' && typeof vendorIdToStore !== 'string') {
+                        console.log(`Converting vendorId to string: ${String(vendorIdToStore)}`);
+                        vendorIdToStore = String(vendorIdToStore);
+                    }
+                }
+            } catch (error) {
+                console.log(`Error checking vendor_id type: ${error}`);
+                // Continue with original ID if we can't determine the type
+            }
+
+            console.log(`Inserting availability with vendor_id: ${vendorIdToStore} (${typeof vendorIdToStore})`);
+
             return pool.execute<OkPacket>(
                 `INSERT INTO vendor_availability 
-         (id, vendor_id, start_time, end_time, created_at, updated_at)
-         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-                [id, actualVendorId, startTime, endTime]
+ (id, vendor_id, start_time, end_time, created_at, updated_at)
+ VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [id, vendorIdToStore, startTime, endTime]
             );
         });
 
