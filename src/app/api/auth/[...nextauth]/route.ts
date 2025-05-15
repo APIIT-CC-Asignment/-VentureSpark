@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID as string,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET as string,
-      
+
     })
   ],
   callbacks: {
@@ -36,17 +36,18 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-  
-  
+
+
     async redirect({ url, baseUrl }) {
-      return baseUrl; 
+      return baseUrl;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: '/', 
+    signIn: '/',
   },
 };
 
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
+

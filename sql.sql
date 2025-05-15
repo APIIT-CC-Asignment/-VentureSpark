@@ -1,4 +1,4 @@
--- Hey Fucking Team--
+-- Hey Team--
 
 CREATE TABLE Vendor (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,3 +42,25 @@ CREATE TABLE booking (
 --     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 --     FOREIGN KEY (vendor_id) REFERENCES Vendor(id) ON DELETE CASCADE
 -- );  
+
+CREATE TABLE `vendor_profiles` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `vendor_id` int NOT NULL,
+  `website_url` varchar(255) DEFAULT NULL,
+  `portfolio_documents` text,
+  `years_in_business` int DEFAULT NULL,
+  `business_registration_number` varchar(100) DEFAULT NULL,
+  `tax_identification_number` varchar(50) DEFAULT NULL,
+  `social_media_links` text,
+  `certifications` text,
+  `profile_completion_percentage` tinyint DEFAULT '0',
+  `verification_status` enum('pending','verified','rejected') DEFAULT 'pending',
+  `verification_notes` text,
+  `reviewed_by` int DEFAULT NULL,
+  `reviewed_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `vendor_id` (`vendor_id`),
+  CONSTRAINT `fk_vendor_profiles_vendor_id` FOREIGN KEY (`vendor_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

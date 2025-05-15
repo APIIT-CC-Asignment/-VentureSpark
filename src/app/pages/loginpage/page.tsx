@@ -8,9 +8,9 @@ export default function LoginPage() {
     email: "",
     password: "",
   });
-  const [status, setStatus] = useState<string>("");
+  const [status, setStatus] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: { target: { name: any; value: any; }; }) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
@@ -30,7 +30,7 @@ export default function LoginPage() {
     fetchSession();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault: () => void; }) => {
     e.preventDefault();
     setStatus("Submitting...");
 
@@ -45,9 +45,33 @@ export default function LoginPage() {
 
       if (response.ok) {
         setStatus("Login successful!");
+
+        // Store authentication data
         localStorage.setItem("token", data.token);
         localStorage.setItem("email", formData.email);
-        router.push("/");
+
+        // Check if user is a vendor based on typegroup
+        if (data.typegroup === 'vendor') {
+          // Create vendor authentication data
+          const authData = {
+            isAuthenticated: true,
+            vendorId: data.vendorId || formData.email, // Use vendorId from response or email as fallback
+            email: formData.email
+          };
+          localStorage.setItem("vendorAuth", JSON.stringify(authData));
+
+          // Redirect to vendor dashboard
+          router.push("/pages/vendor-dashboard");
+        } else if (data.typegroup === 'user') {
+          // Redirect regular users to home page
+          router.push("/");
+        } else if (data.typegroup === 'admin') {
+          // Redirect admins to admin dashboard
+          router.push("/pages/admin");
+        } else {
+          // Default redirect for unknown types
+          router.push("/");
+        }
       } else {
         setStatus(`Error: ${data.message}`);
       }
@@ -65,8 +89,8 @@ export default function LoginPage() {
             <div>
               <h1 className="text-2xl font-semibold">Login VentureSpark</h1>
             </div>
-            <div className="mt-4 flex flex-col lg:flex-row items-center justify-between">
-              <div className="w-full lg:w-1/2 ml-0 lg:ml-2">
+            <div className="mt-4 flex flex-col lg:flex-row items-center justify-between gap-2">
+              <div className="w-full lg:w-1/2">
                 <button
                   onClick={() => signIn("google")}
                   type="button"
@@ -76,7 +100,7 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <div className="w-full lg:w-1/2 ml-0 lg:ml-2">
+              <div className="w-full lg:w-1/2">
                 <button
                   onClick={() => signIn("facebook")}
                   type="button"
@@ -128,7 +152,7 @@ export default function LoginPage() {
                     </label>
                   </div>
                   <div className="relative">
-                    <button className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300">
+                    <button type="submit" className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300">
                       Login
                     </button>
                   </div>
@@ -139,14 +163,14 @@ export default function LoginPage() {
                 <p>
                   Want To Create an account?{" "}
                   <a href="/pages/signup" className="text-black hover:underline">
-                    As a Cleient SignUp here
+                    As a User SignUp here
                   </a>
                 </p>
               </div>
               <div className="mt-4 text-sm text-gray-600 text-center">
                 <p>
                   Want To Create an account?{" "}
-                  <a href="/pages/signup-vendor" className="text-black hover:underline">
+                  <a href="/pages/vendorsignup" className="text-black hover:underline">
                     As a Service Provider SignUp here
                   </a>
                 </p>
