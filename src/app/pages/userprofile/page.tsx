@@ -288,7 +288,7 @@ export default function UserProfile() {
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-blue-900 to-blue-700 text-white p-6">
+      <aside className="w-64 bg-gradient-to-b from-[#1E3A8A] to-[#10B981] text-white p-6">
         <h2 className="text-xl font-bold mb-6 flex items-center">
           <button
             onClick={() => router.back()}
@@ -297,13 +297,13 @@ export default function UserProfile() {
           >
             <FiArrowLeft className="w-6 h-6 text-white" />
           </button>
-          User Panel
+          <h3 className="text-white">User Panel</h3>
         </h2>
         <nav className="space-y-2">
           <button 
             onClick={() => setActiveTab('profile')}
             className={`w-full text-left p-2 rounded-lg transition-colors ${
-              activeTab === 'profile' ? 'bg-teal-600' : 'hover:bg-teal-500'
+              activeTab === 'profile' ? 'bg-teal-500' : 'hover:bg-teal-500'
             }`}
           >
             Dashboard
@@ -311,7 +311,7 @@ export default function UserProfile() {
           <button 
             onClick={() => setActiveTab('bookings')}
             className={`w-full text-left p-2 rounded-lg transition-colors ${
-              activeTab === 'bookings' ? 'bg-teal-600' : 'hover:bg-teal-500'
+              activeTab === 'bookings' ? 'bg-teal-500' : 'hover:bg-teal-500'
             }`}
           >
             Bookings
@@ -319,16 +319,13 @@ export default function UserProfile() {
           <button 
             onClick={() => setActiveTab('settings')}
             className={`w-full text-left p-2 rounded-lg transition-colors ${
-              activeTab === 'settings' ? 'bg-teal-600' : 'hover:bg-teal-500'
+              activeTab === 'settings' ? 'bg-teal-500' : 'hover:bg-teal-500'
             }`}
           >
             Settings
           </button>
         </nav>
-        <button className="mt-6 w-full bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 flex items-center justify-center">
-          <span className="mr-2">1 Issue</span>
-          <span className="text-xl">✖</span>
-        </button>
+        
       </aside>
 
       {/* Main Content */}
