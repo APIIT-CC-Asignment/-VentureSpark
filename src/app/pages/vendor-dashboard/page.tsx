@@ -1033,7 +1033,7 @@ const VendorDashboard: React.FC = () => {
               <div className="w-10 h-10 bg-gradient-to-br from-[#B9FF66] to-[#8BC34A] rounded-xl mr-3 flex items-center justify-center shadow-lg">
                 <span className="text-lg font-bold text-black">V</span>
               </div>
-              {sidebarOpen && <span className="text-xl font-bold text-black">Vendor Spark</span>}
+              {sidebarOpen && <span className="text-xl font-bold text-black">{vendorInfo?.username}'s Dashboard</span>}
             </div>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}

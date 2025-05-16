@@ -54,7 +54,7 @@ export default function Signup() {
         setFormData({ username: "", email: "", password: "", message: "" });
 
         // Navigate to vendor details page
-        router.push("/pages/vendordetails");
+        router.push("/pages/vendor-dashboard");
       } else {
         if (response.status === 409) {
           setStatus(`Error: ${data.message}`);
