@@ -64,7 +64,7 @@ export default function LoginPage() {
           router.push("/pages/vendor-dashboard");
         } else if (data.typegroup === 'user') {
           // Redirect regular users to home page
-          router.push("/");
+          window.location.href = "/pages/userprofile";
         } else if (data.typegroup === 'admin') {
           // Redirect admins to admin dashboard
           router.push("/pages/admin");
@@ -163,15 +163,15 @@ export default function LoginPage() {
                 <p>
                   Want To Create an account?{" "}
                   <a href="/pages/signup" className="text-black hover:underline">
-                    As a User SignUp here
+                    As a User Sign up here
                   </a>
                 </p>
               </div>
               <div className="mt-4 text-sm text-gray-600 text-center">
                 <p>
                   Want To Create an account?{" "}
-                  <a href="/pages/vendorsignup" className="text-black hover:underline">
-                    As a Service Provider SignUp here
+                  <a href="/pages/signup-vendor" className="text-black hover:underline">
+                    As a Vendor Sign up here
                   </a>
                 </p>
               </div>
