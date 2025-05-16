@@ -284,19 +284,7 @@ export default function AdminDashboard() {
     setShowServiceModal(true);
   };
 
-  const data = {
-    labels: [
-      "Nov 2024",
-      "Dec 2024",
-      "Jan 2025",
-      "Feb 2025",
-      "Mar 2025",
-      "Apr 2025",
-    ],
-    users: [12, 15, 20, 18, 25, 22],
-    bookings: [30, 40, 35, 50, 45, 55],
-    revenue: [500, 700, 900, 1200, 1000, 1100],
-  };
+  
 
   if (loading)
     return (
@@ -663,10 +651,10 @@ export default function AdminDashboard() {
             </div>
 
 
-            <div>
+            {/* <div>
               <h2 className="text-xl font-semibold mb-4">Monthly Statistics</h2>
               <MonthlyStatsBarChart data={data} />
-            </div>
+            </div> */}
 
             {/* Recent Bookings */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

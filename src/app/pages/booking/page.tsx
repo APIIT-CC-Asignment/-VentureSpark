@@ -54,7 +54,7 @@ useEffect(() => {
     useEffect(() => {
       if (typeof window !== "undefined") {
         setEmail(localStorage.getItem("email"));
-        setName(localStorage.getItem("name"));
+        setName(localStorage.getItem("username"));
       }
     }, []);
 
