@@ -55,7 +55,7 @@ export default function LoginPage() {
           if (data.user.typegroup === "Admin") {
           router.push("/pages/admin");
         } else if (data.user.typegroup === "vendor") {
-          router.push("/pages/vendordetails");
+          router.push("/pages/vendor-dashboard");
         } else {
           router.push("/");
         }

@@ -9,9 +9,12 @@ function HeaderContent() {
   const [email, setEmail] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement | null>(null); // Ref for dropdown
-  const profileRef = useRef<HTMLAnchorElement | null>(null); // Ref for profile icon
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const profileRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -23,40 +26,21 @@ function HeaderContent() {
   const handleLogout = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("token");
-      localStorage.removeItem("typegroup");
-      localStorage.removeItem("name");
-      localStorage.removeItem("username");
       localStorage.removeItem("email");
       localStorage.removeItem("image");
-      localStorage.removeItem("nextauth.message")
-
       setEmail(null);
       setImage(null);
       window.location.reload();
     }
   };
 
-  const menuVariants = {
-    open: { x: 0, opacity: 1 },
-    closed: { x: "100%", opacity: 0 },
-  };
-
-  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-
-  // Mobile Menu State
-  const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const toggleMenu = () => setIsOpen(!isOpen);
-
   const toggleDropdown = () => setIsDropdownVisible(!isDropdownVisible);
 
   return (
@@ -67,17 +51,8 @@ function HeaderContent() {
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <motion.a
-            href="/"
-            className="flex-shrink-0 flex items-center" 
-            whileHover={{ scale: 1.05 }}
-            transition={{ duration: 0.2 }}
-          >
-            <img
-              src="/images/logo.png"
-              alt="Company Logo"
-              className="sm:h-10 h-16 w-auto md:h-16 lg:h-16 rounded-md"
-            />
+          <motion.a href="/" className="flex-shrink-0 flex items-center" whileHover={{ scale: 1.05 }} transition={{ duration: 0.2 }}>
+            <img src="/images/logo.png" alt="Company Logo" className="sm:h-10 h-16 w-auto md:h-16 lg:h-16 rounded-md" />
           </motion.a>
 
           {/* Centered Navigation */}
@@ -90,7 +65,7 @@ function HeaderContent() {
             <motion.a
               href="/pages/booking"
               className="px-4 py-2 rounded-2xl bg-green-600 text-white font-medium hover:bg-green-700 shadow-sm"
-              whileHover={{ scale: 1.05, boxShadow: '0 4px 12px rgba(74, 222, 128, 0.3)' }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.98 }}
               transition={{ duration: 0.2 }}
             >
@@ -132,20 +107,14 @@ function HeaderContent() {
             <button
               onClick={toggleMenu}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-green-600 focus:outline-none"
-              aria-expanded="false"
             >
-              <span className="sr-only">Open main menu</span>
-              {isOpen ? (
-                <FaTimes className="h-6 w-6" />
-              ) : (
-                <FaBars className="h-6 w-6" />
-              )}
+              {isOpen ? <FaTimes className="h-6 w-6" /> : <FaBars className="h-6 w-6" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Profile Dropdown - Desktop */}
+      {/* Desktop Profile Dropdown */}
       {isDropdownVisible && (
         <motion.div
           className="absolute right-0 mt-2 p-4 bg-white rounded-lg shadow-lg w-48 hidden lg:block"
@@ -153,34 +122,47 @@ function HeaderContent() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
-          ref={dropdownRef} // Attach ref to dropdown
+          ref={dropdownRef}
         >
           {email ? (
-            <div className="flex items-center space-x-4">
-              
-              <span className="text-gray-600 font-medium text-sm truncate max-w-[200px]">
-                {email}
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3">
+                <img
+                  src={image || "/default-avatar.png"}
+                  alt="User Profile"
+                  className="w-8 h-8 rounded-full border border-gray-300"
+                  onError={(e) => (e.currentTarget.src = "/default-avatar.png")}
+                />
+                <span className="text-gray-700 font-medium text-sm truncate max-w-[160px]">
+                  {email}
+                </span>
+              </div>
+
+              <motion.a
+                href="/pages/userprofile"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="block w-full text-left text-sm text-green-700 font-medium hover:underline"
+              >
+                View Profile
+              </motion.a>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleLogout}
+                className="block w-full text-left text-sm text-red-600 hover:underline"
+              >
+                Logout
+              </motion.button>
             </div>
           ) : (
             <span className="text-gray-600 font-medium text-sm">Guest</span>
           )}
-
-          {/* Logout Button */}
-          {email && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleLogout}
-              className="mt-2 text-black px-4 py-2  font-medium "
-            >
-              Logout
-            </motion.button>
-          )}
         </motion.div>
       )}
 
-      {/* Mobile Menu - Centered Content */}
+      {/* Mobile Menu */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -202,29 +184,36 @@ function HeaderContent() {
                 </motion.a>
 
                 {email ? (
-            <div className="flex items-center space-x-4 mt-4">
-              {image && (
-                <img
-                  src={image || "/default-avatar.png"}
-                  alt="User Profile"
-                  className="w-10 h-10 rounded-full border border-gray-300"
-                  onError={(e) => (e.currentTarget.src = "/default-avatar.png")}
-                />
-              )}
-              <span className="text-gray-600 font-medium text-sm truncate max-w-[200px]">
-                {email}
-              </span>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full font-medium shadow-md"
-              > 
-                Logout
-              </motion.button>
-            </div>
-          ) : (
-            
+                  <div className="flex flex-col items-center space-y-2 mt-4">
+                    <img
+                      src={image || "/default-avatar.png"}
+                      alt="User Profile"
+                      className="w-10 h-10 rounded-full border border-gray-300"
+                      onError={(e) => (e.currentTarget.src = "/default-avatar.png")}
+                    />
+                    <span className="text-gray-600 font-medium text-sm truncate max-w-[200px]">
+                      {email}
+                    </span>
+
+                    <motion.a
+                      href="/pages/userprofile"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="text-sm text-green-700 font-medium hover:underline"
+                    >
+                      View Profile
+                    </motion.a>
+
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleLogout}
+                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full font-medium shadow-md"
+                    >
+                      Logout
+                    </motion.button>
+                  </div>
+                ) : (
                   <motion.a
                     href="/pages/loginpage"
                     className="mt-4 p-3 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 shadow-sm"
@@ -233,7 +222,6 @@ function HeaderContent() {
                     transition={{ duration: 0.2 }}
                   >
                     <FaUser className="w-6 h-6" />
-                    
                   </motion.a>
                 )}
               </div>
