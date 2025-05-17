@@ -37,6 +37,7 @@ export default function BookingPage() {
   const [error, setError] = useState<string | null>(null);
    const [email, setEmail] = useState<string | null>(null);
    const [name, setName] = useState<string | null>(null);
+   const [typegroup, setGroup] = useState<string | null>(null);
   
 useEffect(() => {
     
@@ -55,6 +56,7 @@ useEffect(() => {
       if (typeof window !== "undefined") {
         setEmail(localStorage.getItem("email"));
         setName(localStorage.getItem("username"));
+         setGroup(localStorage.getItem("typegroup"));
       }
     }, []);
 
@@ -249,8 +251,10 @@ useEffect(() => {
         </motion.a>
       </motion.section>
 
-      {/* Consultants Section */}
-      <section
+
+      {typegroup === "client" && ( 
+        
+       <section
         id="consultants"
         className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
       >
@@ -335,8 +339,10 @@ useEffect(() => {
           })
         )}
       </section>
+      )
+}
 
-      {/* Services Section */}
+      {typegroup === "client" && ( 
       <section
         id="services"
         className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
@@ -428,6 +434,9 @@ useEffect(() => {
           </motion.div>
         )}
       </section>
+      )}
+
+     
 
 
       {email && email.length > 0 ? (
@@ -564,3 +573,7 @@ useEffect(() => {
     </div>
   );
 }
+function setGroup(arg0: string | null) {
+  throw new Error("Function not implemented.");
+}
+
