@@ -26,14 +26,14 @@ export default function AboutPage() {
       name: "Mihilayan Sachinthana",
       title: "Marketing Specialist",
       expertise: "Digital Marketing & Growth Hacking",
-      image: "/images/mihi.jpeg",
+      image: "/images/mihilayan.jpg",
       quote: "Technology should enable, not complicate."
     },
     {
       name: "Anuda Ranasinghe",
       title: "Financial Analyst",
       expertise: "Financial Modeling & Valuation", 
-      image: "/images/anuda.jpg",
+      image: "/images/anudha.jpg",
       quote: "The right connection changes everything."
     },
     {
@@ -162,7 +162,7 @@ export default function AboutPage() {
             viewport={{ once: true }}
           >
             <Image
-              src="/images/teamphoto.jpg"
+              src="/images/group1.jpg"
               alt="Venture Spark team"
               fill
               className="object-cover"
