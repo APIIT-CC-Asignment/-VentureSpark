@@ -46,12 +46,13 @@ export default function LoginPage() {
       if (response.ok) {
         setStatus("Login successful!");
 
-        // Store authentication data
+       
         localStorage.setItem("token", data.token);
         localStorage.setItem("email", formData.email);
-    
-        localStorage.setItem("typegroup", data.typegroup || "");
+        localStorage.setItem("name", data.name);
+        localStorage.setItem("typegroup", data.typegroup);
 
+        // Check if user is a vendor based on typegroup
         if (data.typegroup === 'vendor') {
           const authData = {
             isAuthenticated: true,
@@ -62,10 +63,13 @@ export default function LoginPage() {
 
           router.push("/pages/vendor-dashboard");
         } else if (data.typegroup === 'user') {
-          router.push("/pages/userprofile");
-        } else if (data.typegroup === 'Admin') {
+          // Redirect regular users to home page
+          window.location.href = "/pages/userprofile";
+        } else if (data.typegroup === 'admin') {
+          // Redirect admins to admin dashboard
           router.push("/pages/admin");
         } else {
+          // Default redirect for unknown types
           router.push("/");
         }
       } else {
