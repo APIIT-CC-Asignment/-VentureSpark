@@ -49,10 +49,10 @@ export default function LoginPage() {
         // Store authentication data
         localStorage.setItem("token", data.token);
         localStorage.setItem("email", formData.email);
+    
+        localStorage.setItem("typegroup", data.typegroup || "");
 
-        // Check if user is a vendor based on typegroup
         if (data.typegroup === 'vendor') {
-          // Create vendor authentication data
           const authData = {
             isAuthenticated: true,
             vendorId: data.vendorId || formData.email, // Use vendorId from response or email as fallback
@@ -60,16 +60,12 @@ export default function LoginPage() {
           };
           localStorage.setItem("vendorAuth", JSON.stringify(authData));
 
-          // Redirect to vendor dashboard
           router.push("/pages/vendor-dashboard");
         } else if (data.typegroup === 'user') {
-          // Redirect regular users to home page
-          window.location.href = "/pages/userprofile";
-        } else if (data.typegroup === 'admin') {
-          // Redirect admins to admin dashboard
+          router.push("/pages/userprofile");
+        } else if (data.typegroup === 'Admin') {
           router.push("/pages/admin");
         } else {
-          // Default redirect for unknown types
           router.push("/");
         }
       } else {
