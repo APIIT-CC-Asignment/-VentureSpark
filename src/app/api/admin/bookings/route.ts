@@ -12,14 +12,14 @@ type Booking = {
   what_you_need: string;
   createdate: string;
   committed: string;
-  Requstedservice: string;
+  Requestedservice: string;
   status: string;
 };
 
 export async function GET() {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT id, name, email, request_date, what_you_need, createdate, committed, Requstedservice,status FROM Booking"
+      "SELECT id, name, email, request_date, what_you_need, createdate, committed, Requestedservice,status FROM Booking"
     );
 
     const bookings: Booking[] = rows.map((row) => ({
@@ -30,7 +30,7 @@ export async function GET() {
       what_you_need: row.what_you_need,
       createdate: row.createdate,
       committed: row.committed,
-      Requstedservice: row.Requstedservice,
+      Requestedservice: row.Requestedservice,
       status: row.status,
     }));
 

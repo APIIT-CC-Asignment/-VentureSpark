@@ -52,7 +52,7 @@ export default function LoginPage() {
         localStorage.setItem("username", data.user.username);
         localStorage.setItem("typegroup", data.user.typegroup);
 
-          if (data.user.typegroup === "Admin") {
+          if (data.user.typegroup === "admin") {
           router.push("/pages/admin");
         } else if (data.user.typegroup === "vendor") {
           router.push("/pages/vendordetails");

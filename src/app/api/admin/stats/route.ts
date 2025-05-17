@@ -38,9 +38,9 @@ export async function GET() {
 
    
     const [serviceDistResult] = await pool.query<RowDataPacket[]>(`
-      SELECT Requstedservice AS label, COUNT(*) AS count
+      SELECT Requestedservice AS label, COUNT(*) AS count
       FROM booking
-      GROUP BY Requstedservice
+      GROUP BY Requestedservice
     `);
 
     const serviceDistribution = {
@@ -50,7 +50,7 @@ export async function GET() {
 
     // 3. Recent bookings
     const [recentBookingsResult] = await pool.query<RowDataPacket[]>(`
-      SELECT id, name, email, request_date, status, Requstedservice, what_you_need, committed
+      SELECT id, name, email, request_date, status, Requestedservice, what_you_need, committed
       FROM booking
       ORDER BY request_date DESC
       LIMIT 5
@@ -62,7 +62,7 @@ export async function GET() {
       email: row.email,
       request_date: row.request_date,
       status: row.status,
-      Requstedservice: row.Requstedservice,
+      Requestedservice: row.Requestedservice,
       whatYouNeed: row.what_you_need,
       committed: row.committed,
     }));

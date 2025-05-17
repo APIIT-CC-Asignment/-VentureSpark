@@ -121,7 +121,7 @@ export default function AdminDashboard() {
   >("dashboard");
   const [users, setUsers] = useState<User[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const email = localStorage.getItem("email") || "";
+  const [email, setEmail] = useState("");
   const [services, setServices] = useState<Service[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -157,6 +157,15 @@ export default function AdminDashboard() {
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
+   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedEmail = localStorage.getItem("email");
+      if (storedEmail) {
+        setEmail(storedEmail);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const group = localStorage.getItem("typegroup");
     
@@ -166,9 +175,9 @@ export default function AdminDashboard() {
 
 
   useEffect(() => {
-    if (usergroup === "Admin") {
+    if (usergroup === "admin") {
       fetchDashboardData();
-    } else if (usergroup && usergroup !== "Admin") {
+    } else if (usergroup && usergroup !== "admin") {
       router.push("/");
     }
   }, [usergroup, router]);
