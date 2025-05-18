@@ -52,7 +52,6 @@ export default function LoginPage() {
         localStorage.setItem("name", data.name);
         localStorage.setItem("typegroup", data.typegroup);
 
-        // Check if user is a vendor based on typegroup
         if (data.typegroup === 'vendor') {
           const authData = {
             isAuthenticated: true,
@@ -63,13 +62,10 @@ export default function LoginPage() {
 
           router.push("/pages/vendor-dashboard");
         } else if (data.typegroup === 'user') {
-          // Redirect regular users to home page
-          window.location.href = "/pages/userprofile";
-        } else if (data.typegroup === 'admin') {
-          // Redirect admins to admin dashboard
+          router.push("/pages/userprofile");
+        } else if (data.typegroup === 'Admin') {
           router.push("/pages/admin");
         } else {
-          // Default redirect for unknown types
           router.push("/");
         }
       } else {
