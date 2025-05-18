@@ -284,7 +284,9 @@ export default function AdminDashboard() {
   };
 
   
-
+if (!usergroup || usergroup !== "Admin") {
+    return <Home />;
+  }
   if (loading)
     return (
       <div className="flex justify-center items-center h-screen">

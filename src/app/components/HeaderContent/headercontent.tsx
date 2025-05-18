@@ -28,6 +28,7 @@ function HeaderContent() {
       localStorage.removeItem("token");
       localStorage.removeItem("email");
       localStorage.removeItem("image");
+      localStorage.removeItem("typegroup");
       setEmail(null);
       setImage(null);
       window.location.reload();
