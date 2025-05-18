@@ -1,10 +1,16 @@
+<<<<<<< Updated upstream
 import { defineConfig } from 'cypress'
  
+=======
+import { defineConfig } from "cypress";
+
+>>>>>>> Stashed changes
 export default defineConfig({
   e2e: {
     setupNodeEvents(on, config) {
       // implement node event listeners here
     },
+<<<<<<< Updated upstream
     baseUrl: 'http://localhost:3000',
     env: {
       DB_HOST: 'localhost',
@@ -18,3 +24,7 @@ export default defineConfig({
     }
   },
 })
+=======
+  },
+});
+>>>>>>> Stashed changes

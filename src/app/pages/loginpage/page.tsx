@@ -55,15 +55,20 @@ export default function LoginPage() {
         if (data.typegroup === 'vendor') {
           const authData = {
             isAuthenticated: true,
-            vendorId: data.vendorId || formData.email, // Use vendorId from response or email as fallback
+            vendorId: data.vendorId || formData.email, 
             email: formData.email
           };
           localStorage.setItem("vendorAuth", JSON.stringify(authData));
 
           router.push("/pages/vendor-dashboard");
         } else if (data.typegroup === 'user') {
+<<<<<<< Updated upstream
           router.push("/pages/userprofile");
         } else if (data.typegroup === 'Admin') {
+=======
+          window.location.href = "/pages/userprofile";
+        } else if (data.typegroup === 'admin') {
+>>>>>>> Stashed changes
           router.push("/pages/admin");
         } else {
           router.push("/");
