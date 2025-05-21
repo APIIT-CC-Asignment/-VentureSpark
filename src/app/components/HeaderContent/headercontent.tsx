@@ -12,6 +12,7 @@ function HeaderContent() {
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [typegroup, setTypegroup] = useState<string | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const profileRef = useRef<HTMLAnchorElement | null>(null);
@@ -19,7 +20,8 @@ function HeaderContent() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setEmail(localStorage.getItem("email"));
-      setImage(localStorage.getItem("image") || "/default-avatar.png");
+      setImage(localStorage.getItem("image") || "/images/face.jpg");
+      setTypegroup(localStorage.getItem("typegroup"));
     }
   }, []);
 
@@ -31,6 +33,7 @@ function HeaderContent() {
       localStorage.removeItem("typegroup");
       setEmail(null);
       setImage(null);
+      setTypegroup(null);
       window.location.reload();
     }
   };
@@ -43,6 +46,22 @@ function HeaderContent() {
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const toggleDropdown = () => setIsDropdownVisible(!isDropdownVisible);
+
+  // Determine profile link based on user type
+  const getProfileLink = () => {
+    if (typegroup === 'vendor') {
+      return '/pages/vendor-dashboard';
+    }
+    return '/pages/userprofile';
+  };
+
+  // Profile link text based on user type
+  const getProfileLinkText = () => {
+    if (typegroup === 'vendor') {
+      return 'Vendor Dashboard';
+    }
+    return 'View Profile';
+  };
 
   return (
     <header className={`
@@ -84,10 +103,10 @@ function HeaderContent() {
                 onClick={toggleDropdown}
               >
                 <img
-                  src={image || "/default-avatar.png"}
+                  src={image || "/images/face.jpg"}
                   alt="User Profile"
                   className="w-10 h-10 rounded-full border border-gray-300"
-                  onError={(e) => (e.currentTarget.src = "/default-avatar.png")}
+                  onError={(e) => (e.currentTarget.src = "/images/face.jpg")}
                 />
               </motion.a>
             ) : (
@@ -129,10 +148,10 @@ function HeaderContent() {
             <div className="space-y-2">
               <div className="flex items-center space-x-3">
                 <img
-                  src={image || "/default-avatar.png"}
+                  src={image || "/images/face.jpg"}
                   alt="User Profile"
                   className="w-8 h-8 rounded-full border border-gray-300"
-                  onError={(e) => (e.currentTarget.src = "/default-avatar.png")}
+                  onError={(e) => (e.currentTarget.src = "/images/face.jpg")}
                 />
                 <span className="text-gray-700 font-medium text-sm truncate max-w-[160px]">
                   {email}
@@ -140,12 +159,12 @@ function HeaderContent() {
               </div>
 
               <motion.a
-                href="/pages/userprofile"
+                href={getProfileLink()}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="block w-full text-left text-sm text-green-700 font-medium hover:underline"
               >
-                View Profile
+                {getProfileLinkText()}
               </motion.a>
 
               <motion.button
@@ -187,22 +206,22 @@ function HeaderContent() {
                 {email ? (
                   <div className="flex flex-col items-center space-y-2 mt-4">
                     <img
-                      src={image || "/default-avatar.png"}
+                      src={image || "/images/face.jpg"}
                       alt="User Profile"
                       className="w-10 h-10 rounded-full border border-gray-300"
-                      onError={(e) => (e.currentTarget.src = "/default-avatar.png")}
+                      onError={(e) => (e.currentTarget.src = "/images/face.jpg")}
                     />
                     <span className="text-gray-600 font-medium text-sm truncate max-w-[200px]">
                       {email}
                     </span>
 
                     <motion.a
-                      href="/pages/userprofile"
+                      href={getProfileLink()}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="text-sm text-green-700 font-medium hover:underline"
                     >
-                      View Profile
+                      {getProfileLinkText()}
                     </motion.a>
 
                     <motion.button

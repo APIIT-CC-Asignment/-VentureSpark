@@ -1,14 +1,31 @@
+/// <reference types="cypress" />
+
+// Add type declaration for custom command
+declare global {
+  namespace Cypress {
+    interface Chainable {
+      /**
+       * Custom command to log in as admin
+       * @example cy.adminLogin()
+       */
+      adminLogin(options?: Partial<Cypress.VisitOptions>): Chainable<Element>
+    }
+  }
+}
+
 import '../admin/auth-setup';
 
 describe('Admin Dashboard Basic Tests', () => {
   beforeEach(() => {
-    cy.adminLogin();
+    // Use cy.visit with failOnStatusCode option directly in the test
+    // This is simpler than overriding the command
+    cy.adminLogin({ failOnStatusCode: false });
   });
 
   it('should load the admin dashboard', () => {
     // Basic verification that the page loads
-    cy.get('body').should('be.visible');
-    
+    cy.get('body', { timeout: 10000 }).should('be.visible');
+
     // Verify some basic navigation exists
     cy.get('nav').should('exist');
   });

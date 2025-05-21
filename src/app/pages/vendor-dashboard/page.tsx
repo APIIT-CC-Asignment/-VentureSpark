@@ -27,7 +27,8 @@ import {
   StarIcon,
   ArrowUpIcon,
   ArrowDownIcon,
-  MoreVerticalIcon
+  MoreVerticalIcon,
+  Home
 } from 'lucide-react';
 
 // Updated interfaces based on actual table structure
@@ -92,6 +93,21 @@ interface FeedbackState {
   message: string;
 }
 
+// Helper function to format verification status
+const formatVerificationStatus = (status?: string) => {
+  if (!status) return 'Pending';
+
+  switch (status) {
+    case 'verified':
+      return 'Verified';
+    case 'rejected':
+      return 'Rejected';
+    case 'pending':
+    default:
+      return 'Pending';
+  }
+};
+
 const sidebarItems = [
   { id: 'dashboard', icon: <BuildingIcon className="w-5 h-5" />, label: 'Overview' },
   { id: 'profile', icon: <UserIcon className="w-5 h-5" />, label: 'Profile' },
@@ -114,6 +130,7 @@ const VendorDashboard: React.FC = () => {
   // State for vendor data
   const [vendorInfo, setVendorInfo] = useState<VendorBasicInfo | null>(null);
   const [vendorProfile, setVendorProfile] = useState<VendorProfile | null>(null);
+  const [usergroup, setUsergroup] = useState<string | null>(null);
 
   // UI states
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -124,13 +141,12 @@ const VendorDashboard: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableProfile, setEditableProfile] = useState<VendorProfile | null>(null);
 
-  // Helper function to format status
-  const formatVerificationStatus = (status?: string) => {
-    if (!status) return 'Pending';
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
+  // Session states
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionStatusFilter, setSessionStatusFilter] = useState<string>('all');
 
-  // Add formatDateTime function
+  // Helper function to format status
   const formatDateTime = (dateTime: string) => {
     try {
       if (!dateTime) return 'Invalid date/time';
@@ -536,7 +552,7 @@ const VendorDashboard: React.FC = () => {
               <select
                 value={sessionDuration}
                 onChange={(e) => setSessionDuration(Number(e.target.value))}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent"
               >
                 <option value={15}>15 minutes</option>
                 <option value={30}>30 minutes</option>
@@ -555,7 +571,7 @@ const VendorDashboard: React.FC = () => {
                 value={selectedDate.toISOString().split('T')[0]}
                 onChange={(e) => setSelectedDate(new Date(e.target.value))}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent"
               />
               <p className="text-sm text-gray-600 mt-1">{formatDate(selectedDate)}</p>
             </div>
@@ -569,7 +585,7 @@ const VendorDashboard: React.FC = () => {
                     key={time}
                     onClick={() => timeSlots.includes(time) ? removeTimeSlot(time) : addTimeSlot(time)}
                     className={`p-2 rounded-lg text-sm font-medium transition-all ${timeSlots.includes(time)
-                      ? 'bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black shadow-lg'
+                      ? 'bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white shadow-lg'
                       : 'bg-gray-100 text-black hover:bg-gray-200'
                       }`}
                   >
@@ -587,12 +603,12 @@ const VendorDashboard: React.FC = () => {
                   {timeSlots.map(time => (
                     <span
                       key={time}
-                      className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black text-sm font-medium rounded-full"
+                      className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white text-sm font-medium rounded-full"
                     >
                       {time}
                       <button
                         onClick={() => removeTimeSlot(time)}
-                        className="ml-2 hover:bg-black hover:bg-opacity-10 rounded-full p-1"
+                        className="ml-2 hover:bg-white hover:bg-opacity-20 rounded-full p-1"
                       >
                         <XIcon className="w-3 h-3" />
                       </button>
@@ -606,7 +622,7 @@ const VendorDashboard: React.FC = () => {
             <button
               onClick={saveAvailability}
               disabled={isLoading || timeSlots.length === 0}
-              className="w-full py-3 bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black font-semibold rounded-lg hover:opacity-90 disabled:opacity-50 shadow-lg"
+              className="w-full py-3 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white font-semibold rounded-lg hover:opacity-90 disabled:opacity-50 shadow-lg"
             >
               {isLoading ? 'Saving...' : 'Save Availability'}
             </button>
@@ -679,7 +695,7 @@ const VendorDashboard: React.FC = () => {
                                       key={slot.id}
                                       className="inline-flex items-center group"
                                     >
-                                      <span className="bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black text-xs font-medium px-3 py-1 rounded-full">
+                                      <span className="bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white text-xs font-medium px-3 py-1 rounded-full">
                                         {formatTimeOnly(slot.start_time)} - {formatTimeOnly(slot.end_time)}
                                       </span>
                                       <button
@@ -735,7 +751,7 @@ const VendorDashboard: React.FC = () => {
                             key={page}
                             onClick={() => setCurrentPage(page)}
                             className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
-                              ? 'bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black'
+                              ? 'bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white'
                               : 'border border-gray-300 text-black hover:bg-gray-50'
                               }`}
                           >
@@ -766,9 +782,24 @@ const VendorDashboard: React.FC = () => {
   useEffect(() => {
     const storedAuth = localStorage.getItem('vendorAuth');
     const email = localStorage.getItem('email');
+    const typegroup = localStorage.getItem('typegroup');
 
     console.log('Stored auth:', storedAuth); // Debug log
     console.log('Stored email:', email); // Debug log
+    console.log('User type:', typegroup); // Debug log
+
+    // If user is not a vendor, redirect appropriately
+    if (typegroup && typegroup !== 'vendor') {
+      console.log('User is not a vendor, redirecting...');
+      if (typegroup === 'client') {
+        // If client, redirect to home
+        router.push('/');
+      } else {
+        // If any other type or not logged in, redirect to login
+        router.push('/pages/loginpage');
+      }
+      return;
+    }
 
     if (email && storedAuth) {
       try {
@@ -780,6 +811,7 @@ const VendorDashboard: React.FC = () => {
           email: email,
           vendorId: parsedAuth.vendorId || email
         });
+        setUsergroup(typegroup);
         console.log('Final auth state will be:', {
           ...parsedAuth,
           isAuthenticated: true,
@@ -791,18 +823,28 @@ const VendorDashboard: React.FC = () => {
         localStorage.removeItem('vendorAuth');
         router.push('/pages/loginpage');
       }
-    } else if (email) {
+    } else if (email && typegroup === 'vendor') {
       console.log('Only email found, creating auth with email as vendorId'); // Debug log
       setAuth({
         isAuthenticated: true,
         vendorId: email,
         email: email
       });
+      setUsergroup(typegroup);
     } else {
-      console.log('No auth data found, redirecting to signup'); // Debug log
+      console.log('No auth data found or not a vendor, redirecting to login'); // Debug log
       router.push('/pages/loginpage');
     }
   }, [router]);
+
+  // Add a useEffect to check usergroup changes
+  useEffect(() => {
+    // If user is authenticated but not a vendor, redirect to home
+    if (auth.isAuthenticated && usergroup && usergroup !== 'vendor') {
+      console.log('User is authenticated but not a vendor, redirecting to home');
+      router.push('/');
+    }
+  }, [usergroup, auth.isAuthenticated, router]);
 
   // Load data after authentication
   useEffect(() => {
@@ -823,6 +865,7 @@ const VendorDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error loading data:', error);
       setFeedback({ type: 'error', message: 'Failed to load vendor data. Please try again.' });
+      setDataLoaded(true); // Set to true even on error to prevent infinite loading
     }
   };
 
@@ -830,7 +873,11 @@ const VendorDashboard: React.FC = () => {
     try {
       console.log('Fetching vendor info for ID:', auth.vendorId); // Debug log
       console.log('Full URL:', `/api/vendor?vendorId=${auth.vendorId}`); // Debug log
-      const response = await fetch(`/api/vendor?vendorId=${auth.vendorId}`);
+
+      // Ensure vendorId is properly encoded
+      const encodedVendorId = encodeURIComponent(String(auth.vendorId));
+      const response = await fetch(`/api/vendor?vendorId=${encodedVendorId}`);
+
       console.log('Response status:', response.status); // Debug log
       console.log('Response headers:', Object.fromEntries(response.headers.entries())); // Debug log
 
@@ -848,23 +895,91 @@ const VendorDashboard: React.FC = () => {
 
       const data = await response.json();
       console.log('Vendor info data:', data); // Debug log
-      setVendorInfo(data);
+
+      // Validate the received data
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid vendor data received');
+      }
+
+      // Ensure all required fields are present with default values if missing
+      const validatedData = {
+        id: data.id || '',
+        username: data.username || 'Vendor',
+        email: data.email || auth.email || '',
+        typegroup: data.typegroup || 'vendor',
+        created_at: data.created_at || new Date().toISOString(),
+        service_name: data.service_name || '',
+        years_of_excellence: data.years_of_excellence || 0,
+        contact_number: data.contact_number || '',
+        address: data.address || '',
+        selected_services: data.selected_services || '[]',
+        type: data.type || 'vendor',
+        active: data.active ?? true,
+        expertise_in: data.expertise_in || ''
+      };
+
+      setVendorInfo(validatedData);
     } catch (error) {
       console.error('Error fetching vendor info:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load vendor information.';
       setFeedback({ type: 'error', message: errorMessage });
+
+      // Set default vendor info if fetch fails
+      const defaultVendorInfo = {
+        id: auth.vendorId,
+        username: 'Vendor',
+        email: auth.email,
+        typegroup: 'vendor',
+        created_at: new Date().toISOString(),
+        service_name: '',
+        years_of_excellence: 0,
+        contact_number: '',
+        address: '',
+        selected_services: '[]',
+        type: 'vendor',
+        active: true,
+        expertise_in: ''
+      };
+      setVendorInfo(defaultVendorInfo as VendorBasicInfo);
     }
   };
 
   const fetchVendorProfile = async () => {
     try {
       // Using query parameter to match your API structure
-      const response = await fetch(`/api/vendor-profile?vendorId=${auth.vendorId}`);
+      const encodedVendorId = encodeURIComponent(String(auth.vendorId));
+      const response = await fetch(`/api/vendor?vendorId=${encodedVendorId}`);
 
       if (response.ok) {
         const data = await response.json();
-        setVendorProfile(data);
-        setEditableProfile(data);
+
+        // Validate the received data
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid vendor profile data received');
+        }
+
+        // Ensure all required fields are present with default values if missing
+        const validatedProfile = {
+          id: data.id || '',
+          vendor_id: data.vendor_id || auth.vendorId,
+          website_url: data.website_url || '',
+          portfolio_documents: data.portfolio_documents || '[]',
+          years_in_business: data.years_in_business || 0,
+          business_registration_number: data.business_registration_number || '',
+          tax_identification_number: data.tax_identification_number || '',
+          social_media_links: data.social_media_links || '{}',
+          certifications: data.certifications || '[]',
+          profile_completion_percentage: data.profile_completion_percentage || 0,
+          verification_status: data.verification_status || 'pending',
+          verification_notes: data.verification_notes || '',
+          reviewed_by: data.reviewed_by || null,
+          reviewed_at: data.reviewed_at || null,
+          created_at: data.created_at || new Date().toISOString(),
+          updated_at: data.updated_at || new Date().toISOString()
+        };
+
+        setVendorProfile(validatedProfile);
+        setEditableProfile(validatedProfile);
       } else if (response.status === 404) {
         // Profile doesn't exist, create default
         const defaultProfile: VendorProfile = {
@@ -887,11 +1002,35 @@ const VendorDashboard: React.FC = () => {
         };
         setVendorProfile(defaultProfile);
         setEditableProfile(defaultProfile);
+      } else {
+        throw new Error(`Failed to fetch vendor profile: ${response.status}`);
       }
     } catch (error) {
       console.error('Error fetching vendor profile:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load vendor profile.';
       setFeedback({ type: 'error', message: errorMessage });
+
+      // Set default profile if fetch fails
+      const defaultProfile: VendorProfile = {
+        id: '',
+        vendor_id: auth.vendorId,
+        website_url: '',
+        portfolio_documents: '[]',
+        years_in_business: 0,
+        business_registration_number: '',
+        tax_identification_number: '',
+        social_media_links: '{}',
+        certifications: '[]',
+        profile_completion_percentage: 0,
+        verification_status: 'pending',
+        verification_notes: '',
+        reviewed_by: null,
+        reviewed_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      setVendorProfile(defaultProfile);
+      setEditableProfile(defaultProfile);
     }
   };
 
@@ -944,6 +1083,33 @@ const VendorDashboard: React.FC = () => {
     setIsEditing(true);
   };
 
+  // Handle service name change specifically
+  const handleServiceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isEditing) {
+      const newServiceName = e.target.value;
+      console.log('Updating service_name to:', newServiceName);
+
+      // Update both states to ensure consistency
+      setVendorInfo(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          service_name: newServiceName
+        };
+      });
+
+      if (editableProfile) {
+        setEditableProfile(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            service_name: newServiceName
+          };
+        });
+      }
+    }
+  };
+
   const handleProfileSave = async () => {
     if (!editableProfile) return;
 
@@ -953,26 +1119,53 @@ const VendorDashboard: React.FC = () => {
 
       if (editableProfile.id) {
         // Update existing profile
-        url = `/api/vendor-profile`;
+        url = `/api/vendor`;
         method = 'PUT';
       } else {
         // Create new profile
-        url = `/api/vendor-profile`;
+        url = `/api/vendor`;
         method = 'POST';
       }
+
+      // Combine vendorInfo and editableProfile to ensure all fields are updated
+      const updatedData = {
+        ...vendorInfo,
+        ...editableProfile,
+        id: vendorInfo?.id || editableProfile.id,
+        email: vendorInfo?.email,
+        // Explicitly include service_name to ensure it's updated
+        service_name: vendorInfo?.service_name
+      };
+
+      console.log('Sending data to update vendor:', updatedData);
 
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editableProfile)
+        body: JSON.stringify(updatedData)
       });
 
       if (response.ok) {
         const updatedProfile = await response.json();
+        console.log('Updated profile received:', updatedProfile);
+
+        // Update both vendorProfile and vendorInfo states
         setVendorProfile(updatedProfile);
         setEditableProfile(updatedProfile);
+
+        // Update vendorInfo with the new service_name and other fields
+        setVendorInfo(prevInfo => ({
+          ...prevInfo,
+          ...updatedProfile
+        }));
+
         setIsEditing(false);
         setFeedback({ type: 'success', message: 'Profile updated successfully!' });
+
+        // Reload data after a short delay to ensure we get the latest from the server
+        setTimeout(() => {
+          loadVendorData();
+        }, 1000);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to save profile');
@@ -996,6 +1189,12 @@ const VendorDashboard: React.FC = () => {
     setActiveTab(tab);
   };
 
+  useEffect(() => {
+    const group = localStorage.getItem("typegroup");
+
+    setUsergroup(group);
+  }, []);
+
   // Effect to log when availability tab is activated
   useEffect(() => {
     if (activeTab === 'availability') {
@@ -1003,20 +1202,117 @@ const VendorDashboard: React.FC = () => {
     }
   }, [activeTab, auth.vendorId]);
 
-  if (!auth.isAuthenticated) {
-    return null;
+  // Effect to load sessions when the tab is activated
+  useEffect(() => {
+    if (activeTab === 'sessions' && auth.isAuthenticated && auth.vendorId) {
+      fetchSessions();
+    }
+  }, [activeTab, auth.isAuthenticated, auth.vendorId]);
+
+  // Function to fetch sessions
+  const fetchSessions = async () => {
+    if (!auth.vendorId) return;
+
+    setSessionsLoading(true);
+    try {
+      const response = await fetch(`/api/vendor-sessions?vendorId=${auth.vendorId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data);
+      } else {
+        setFeedback({ type: 'error', message: 'Failed to load sessions. Please try again.' });
+      }
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+      setFeedback({ type: 'error', message: 'Failed to load sessions. Please try again.' });
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  // Function to update session status
+  const updateSessionStatus = async (sessionId: string, status: 'confirmed' | 'completed' | 'cancelled') => {
+    if (!auth.vendorId) return;
+
+    try {
+      setFeedback({ type: 'info', message: 'Updating session status...' });
+
+      const response = await fetch('/api/vendor-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          vendorId: auth.vendorId,
+          status
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFeedback({ type: 'success', message: data.message });
+        // Update the session in the local state
+        setSessions(prevSessions =>
+          prevSessions.map(session =>
+            session.id === sessionId
+              ? { ...session, status }
+              : session
+          )
+        );
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update session status');
+      }
+    } catch (error) {
+      console.error('Error updating session status:', error);
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to update session status'
+      });
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return 'Invalid date';
+    }
+  };
+
+  // Check if we should render the page at all
+  if (!auth.isAuthenticated || (usergroup && usergroup !== 'vendor')) {
+    // Show loading instead of content while redirecting
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+          <div className="w-12 h-12 bg-gradient-to-br from-[#1E3A8A] to-[#10B981] rounded-lg mx-auto mb-4 flex items-center justify-center">
+            <BuildingIcon className="w-6 h-6 text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-center mb-4 text-[#1E3A8A]">Redirecting...</h2>
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#10B981]"></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!dataLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#B9FF66] to-[#8BC34A] rounded-lg mx-auto mb-4 flex items-center justify-center">
-            <BuildingIcon className="w-6 h-6 text-black" />
+          <div className="w-12 h-12 bg-gradient-to-br from-[#1E3A8A] to-[#10B981] rounded-lg mx-auto mb-4 flex items-center justify-center">
+            <BuildingIcon className="w-6 h-6 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-center mb-4 text-black">Loading Dashboard...</h2>
+          <h2 className="text-xl font-bold text-center mb-4 text-[#1E3A8A]">Loading Dashboard...</h2>
           <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#B9FF66]"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#10B981]"></div>
           </div>
         </div>
       </div>
@@ -1026,18 +1322,18 @@ const VendorDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Enhanced Modern Sidebar */}
-      <div className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-white shadow-xl border-r border-gray-200 transition-all duration-300 ease-in-out relative`}>
+      <div className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-gradient-to-b from-[#1E3A8A] to-[#10B981] shadow-xl transition-all duration-300 ease-in-out relative`}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-8">
             <div className={`flex items-center ${sidebarOpen ? '' : 'justify-center'} transition-all duration-300`}>
-              <div className="w-10 h-10 bg-gradient-to-br from-[#B9FF66] to-[#8BC34A] rounded-xl mr-3 flex items-center justify-center shadow-lg">
-                <span className="text-lg font-bold text-black">V</span>
+              <div className="w-10 h-10 bg-white rounded-xl mr-3 flex items-center justify-center shadow-lg">
+                <span className="text-lg font-bold text-[#1E3A8A]">V</span>
               </div>
-              {sidebarOpen && <span className="text-xl font-bold text-black">{vendorInfo?.username}'s Dashboard</span>}
+              {sidebarOpen && <span className="text-xl font-bold text-white">{vendorInfo?.username}'s Dashboard</span>}
             </div>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-gray-500 hover:text-black transition-colors p-2 rounded-lg hover:bg-gray-100"
+              className="text-white hover:text-gray-200 transition-colors p-2 rounded-lg hover:bg-white/10"
             >
               {sidebarOpen ? <ChevronLeftIcon className="w-5 h-5" /> : <ChevronRightIcon className="w-5 h-5" />}
             </button>
@@ -1049,8 +1345,8 @@ const VendorDashboard: React.FC = () => {
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
                 className={`w-full flex items-center p-4 rounded-xl transition-all duration-200 ${activeTab === item.id
-                  ? 'bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black shadow-lg transform scale-105 font-semibold'
-                  : 'text-black hover:bg-gray-100 hover:shadow-md'
+                  ? 'bg-white text-[#1E3A8A] shadow-lg transform scale-105 font-semibold'
+                  : 'text-white hover:bg-white/10 hover:shadow-md'
                   }`}
               >
                 <div className={`${activeTab === item.id ? 'scale-110' : ''} transition-transform duration-200`}>
@@ -1058,9 +1354,9 @@ const VendorDashboard: React.FC = () => {
                 </div>
                 {sidebarOpen && <span className="ml-3 font-medium">{item.label}</span>}
                 {!sidebarOpen && activeTab === item.id && (
-                  <div className="absolute left-24 bg-gray-900 text-white px-3 py-1 rounded-md shadow-lg z-50">
+                  <div className="absolute left-24 bg-white text-[#1E3A8A] px-3 py-1 rounded-md shadow-lg z-50">
                     <span className="text-sm whitespace-nowrap">{item.label}</span>
-                    <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 border-r-4 border-r-gray-900 border-y-4 border-y-transparent"></div>
+                    <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 border-r-4 border-r-white border-y-4 border-y-transparent"></div>
                   </div>
                 )}
               </button>
@@ -1068,10 +1364,10 @@ const VendorDashboard: React.FC = () => {
           </nav>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-100">
+        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/20">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center p-4 text-black hover:bg-red-50 hover:text-red-600 rounded-xl transition-all duration-200"
+            className="w-full flex items-center p-4 text-white hover:bg-white/10 rounded-xl transition-all duration-200"
           >
             <LogOutIcon className="w-5 h-5" />
             {sidebarOpen && <span className="ml-3 font-medium">Logout</span>}
@@ -1084,7 +1380,7 @@ const VendorDashboard: React.FC = () => {
             onClick={() => setSidebarOpen(true)}
             className="absolute -right-4 top-8 bg-white shadow-lg border border-gray-200 p-2 rounded-full hover:shadow-xl transition-all"
           >
-            <ChevronRightIcon className="w-4 h-4 text-black" />
+            <ChevronRightIcon className="w-4 h-4 text-[#1E3A8A]" />
           </button>
         )}
       </div>
@@ -1092,24 +1388,24 @@ const VendorDashboard: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Enhanced Top Bar */}
-        <header className="bg-white shadow-sm border-b border-gray-200 h-20 flex items-center justify-between px-8">
+        <header className="bg-gradient-to-r from-[#1E3A8A]/10 to-[#10B981]/10 shadow-sm border-b border-gray-200 h-20 flex items-center justify-between px-8">
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-black">
+            <h1 className="text-2xl font-bold text-[#1E3A8A]">
               {sidebarItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
             </h1>
           </div>
           <div className="flex items-center space-x-6">
-            <button className="p-3 text-black hover:bg-gray-100 rounded-lg transition-colors">
+            <button className="p-3 text-[#1E3A8A] hover:bg-gray-100 rounded-lg transition-colors">
               <SearchIcon className="w-5 h-5" />
             </button>
 
             {vendorInfo && (
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-black">{vendorInfo.username}</p>
+                  <p className="text-sm font-semibold text-[#1E3A8A]">{vendorInfo.username}</p>
                   <p className="text-xs text-gray-600">{vendorInfo.email}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-[#B9FF66] to-[#8BC34A] rounded-full flex items-center justify-center text-black font-bold text-lg shadow-lg">
+                <div className="w-12 h-12 bg-gradient-to-br from-[#1E3A8A] to-[#10B981] rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
                   {vendorInfo.username.charAt(0).toUpperCase()}
                 </div>
               </div>
@@ -1120,11 +1416,11 @@ const VendorDashboard: React.FC = () => {
             <div className="relative bg-gray-100 rounded-lg p-3">
               <div className="w-36 h-3 bg-gray-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] transition-all duration-700 rounded-full"
+                  className="h-full bg-gradient-to-r from-[#1E3A8A] to-[#10B981] transition-all duration-700 rounded-full"
                   style={{ width: `${calculateCompletionPercentage()}%` }}
                 ></div>
               </div>
-              <span className="absolute -top-6 right-0 text-xs font-semibold text-black">
+              <span className="absolute -top-6 right-0 text-xs font-semibold text-[#1E3A8A]">
                 {calculateCompletionPercentage()}% Complete
               </span>
             </div>
@@ -1159,7 +1455,7 @@ const VendorDashboard: React.FC = () => {
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
               {/* Welcome Section */}
-              <div className="bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] rounded-2xl p-8 text-black border border-gray-200 shadow-lg">
+              <div className="bg-gradient-to-r from-[#1E3A8A] to-[#10B981] rounded-2xl p-8 text-white border border-gray-200 shadow-lg">
                 <h2 className="text-3xl font-bold mb-2">
                   Welcome back, {vendorInfo?.username}! 👋
                 </h2>
@@ -1215,7 +1511,7 @@ const VendorDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <button
                     onClick={() => setActiveTab('profile')}
-                    className="flex items-center justify-center p-5 bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
+                    className="flex items-center justify-center p-5 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
                   >
                     <UserIcon className="w-5 h-5 mr-2" />
                     Complete Profile
@@ -1260,7 +1556,7 @@ const VendorDashboard: React.FC = () => {
                         <button
                           onClick={handleProfileSave}
                           disabled={isSubmitting}
-                          className="px-6 py-3 bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black rounded-xl hover:opacity-90 disabled:opacity-50 font-semibold shadow-lg"
+                          className="px-6 py-3 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-black rounded-xl hover:opacity-90 disabled:opacity-50 font-semibold shadow-lg"
                         >
                           {isSubmitting ? 'Saving...' : 'Save Changes'}
                         </button>
@@ -1268,7 +1564,7 @@ const VendorDashboard: React.FC = () => {
                     ) : (
                       <button
                         onClick={handleProfileEdit}
-                        className="px-6 py-3 bg-gradient-to-r from-[#B9FF66] to-[#8BC34A] text-black rounded-xl hover:opacity-90 font-semibold shadow-lg"
+                        className="px-6 py-3 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-black rounded-xl hover:opacity-90 font-semibold shadow-lg"
                       >
                         <EditIcon className="w-4 h-4 inline mr-2" />
                         Edit Profile
@@ -1308,9 +1604,9 @@ const VendorDashboard: React.FC = () => {
                         type="text"
                         value={vendorInfo.service_name || ''}
                         disabled={!isEditing}
-                        onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, service_name: e.target.value })}
+                        onChange={handleServiceNameChange}
                         placeholder="Enter your business name"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1322,7 +1618,7 @@ const VendorDashboard: React.FC = () => {
                         disabled={!isEditing}
                         onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, contact_number: e.target.value })}
                         placeholder="Enter contact number"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1334,7 +1630,7 @@ const VendorDashboard: React.FC = () => {
                         disabled={!isEditing}
                         onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, expertise_in: e.target.value })}
                         placeholder="e.g., Business Strategy, Marketing"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1346,7 +1642,7 @@ const VendorDashboard: React.FC = () => {
                         disabled={!isEditing}
                         onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, years_of_excellence: parseInt(e.target.value) || 0 })}
                         placeholder="Years of experience"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1358,7 +1654,7 @@ const VendorDashboard: React.FC = () => {
                         onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, address: e.target.value })}
                         placeholder="Enter business address"
                         rows={3}
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
                   </div>
@@ -1375,7 +1671,7 @@ const VendorDashboard: React.FC = () => {
                         onChange={(e) => setEditableProfile(prev => prev ? { ...prev, website_url: e.target.value } : null)}
                         disabled={!isEditing}
                         placeholder="https://yourwebsite.com"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1387,7 +1683,7 @@ const VendorDashboard: React.FC = () => {
                         onChange={(e) => setEditableProfile(prev => prev ? { ...prev, years_in_business: parseInt(e.target.value) || 0 } : null)}
                         disabled={!isEditing}
                         placeholder="0"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1399,7 +1695,7 @@ const VendorDashboard: React.FC = () => {
                         onChange={(e) => setEditableProfile(prev => prev ? { ...prev, business_registration_number: e.target.value } : null)}
                         disabled={!isEditing}
                         placeholder="Enter registration number"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1411,7 +1707,7 @@ const VendorDashboard: React.FC = () => {
                         onChange={(e) => setEditableProfile(prev => prev ? { ...prev, tax_identification_number: e.target.value } : null)}
                         disabled={!isEditing}
                         placeholder="Enter tax ID"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#B9FF66] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
                       />
                     </div>
 
@@ -1440,16 +1736,169 @@ const VendorDashboard: React.FC = () => {
 
           {/* Enhanced Sessions Tab */}
           {activeTab === 'sessions' && (
-            <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-              <h2 className="text-3xl font-bold text-black mb-6">Session Management</h2>
-              <div className="text-center py-16">
-                <div className="w-24 h-24 bg-gradient-to-br from-purple-50 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <ClockIcon className="w-12 h-12 text-purple-600" />
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-3xl font-bold text-black">Client Sessions</h2>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setSessionStatusFilter('all')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'all'
+                        ? 'bg-gradient-to-b from-[#1E3A8A] to-[#10B981] text-white'
+                        : 'bg-gray-100 text-black hover:bg-gray-200'
+                        }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setSessionStatusFilter('pending')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'pending'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-gray-100 text-black hover:bg-gray-200'
+                        }`}
+                    >
+                      Pending
+                    </button>
+                    <button
+                      onClick={() => setSessionStatusFilter('confirmed')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'confirmed'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-black hover:bg-gray-200'
+                        }`}
+                    >
+                      Confirmed
+                    </button>
+                    <button
+                      onClick={() => setSessionStatusFilter('completed')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'completed'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-100 text-black hover:bg-gray-200'
+                        }`}
+                    >
+                      Completed
+                    </button>
+                    <button
+                      onClick={() => setSessionStatusFilter('cancelled')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'cancelled'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gray-100 text-black hover:bg-gray-200'
+                        }`}
+                    >
+                      Cancelled
+                    </button>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold text-black mb-3">No Sessions Yet</h3>
-                <p className="text-gray-600 text-lg">
-                  Once you set up your availability, clients can book sessions with you.
-                </p>
+
+                {sessionsLoading ? (
+                  <div className="flex justify-center items-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#1E3A8A]"></div>
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-24 h-24 bg-gradient-to-br from-purple-50 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <ClockIcon className="w-12 h-12 text-purple-600" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-black mb-3">No Sessions Yet</h3>
+                    <p className="text-gray-600 text-lg">
+                      When clients book sessions with you, they will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Service
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {sessions
+                          .filter(session => sessionStatusFilter === 'all' || session.status === sessionStatusFilter)
+                          .map((session) => (
+                            <tr key={session.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#10B981] flex items-center justify-center text-white font-medium">
+                                    {session.userName ? session.userName.charAt(0).toUpperCase() : '?'}
+                                  </div>
+                                  <div className="ml-4">
+                                    <div className="text-sm font-medium text-gray-900">{session.userName}</div>
+                                    <div className="text-sm text-gray-500">{session.userEmail}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{formatDate(session.request_date)}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-900">{session.serviceName}</div>
+                                <div className="text-sm text-gray-500 truncate max-w-xs">
+                                  {session.message ? (
+                                    <span title={session.message}>
+                                      {session.message.length > 50
+                                        ? `${session.message.substring(0, 50)}...`
+                                        : session.message}
+                                    </span>
+                                  ) : (
+                                    <span className="italic text-gray-400">No message</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                  ${session.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    session.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                                      session.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                        'bg-red-100 text-red-800'}`}>
+                                  {session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Pending'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                {session.status === 'pending' && (
+                                  <div className="flex justify-end space-x-2">
+                                    <button
+                                      onClick={() => updateSessionStatus(session.id, 'confirmed')}
+                                      className="text-xs bg-gradient-to-b from-[#1E3A8A] to-[#10B981] text-white px-3 py-1 rounded-lg hover:opacity-90 transition-colors"
+                                    >
+                                      Accept
+                                    </button>
+                                    <button
+                                      onClick={() => updateSessionStatus(session.id, 'cancelled')}
+                                      className="text-xs bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition-colors"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+                                {session.status === 'confirmed' && (
+                                  <button
+                                    onClick={() => updateSessionStatus(session.id, 'completed')}
+                                    className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors"
+                                  >
+                                    Mark Completed
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}

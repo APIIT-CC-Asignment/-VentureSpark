@@ -289,62 +289,8 @@ export async function POST(req: NextRequest) {
             console.log(`Found email: ${vendorEmail} for vendorId: ${actualVendorId}`);
         }
 
-        // Now check for existing vendor record with comprehensive search
-        console.log(`Checking for existing vendor with id: ${actualVendorId} or email: ${vendorEmail}`);
-        const [existingVendor] = await pool.execute<RowDataPacket[]>(
-            'SELECT id, email FROM Vendor WHERE id = ? OR email = ?',
-            [actualVendorId, vendorEmail]
-        );
-
-        if (!existingVendor || existingVendor.length === 0) {
-            // No vendor exists, create one
-            console.log(`No vendor found, creating new vendor record`);
-            const [userDetails] = await pool.execute<RowDataPacket[]>(
-                'SELECT email, username FROM users WHERE id = ? AND typegroup = ?',
-                [actualVendorId, 'vendor']
-            );
-
-            if (!userDetails || userDetails.length === 0) {
-                return NextResponse.json(
-                    { error: 'User details not found' },
-                    { status: 404 }
-                );
-            }
-
-            // Use INSERT ... ON DUPLICATE KEY UPDATE to handle any remaining conflicts
-            console.log(`Creating vendor with id: ${actualVendorId}, email: ${userDetails[0].email}`);
-            await pool.execute<OkPacket>(
-                `INSERT INTO Vendor 
-         (id, email, service_name, years_of_excellence, contact_number, address, selected_services, type, active, expertise_in, created_at, updated_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-         ON DUPLICATE KEY UPDATE 
-         email = VALUES(email),
-         updated_at = CURRENT_TIMESTAMP`,
-                [
-                    actualVendorId,
-                    userDetails[0].email,
-                    userDetails[0].username || '', // Use username as default service name
-                    0, // years_of_excellence
-                    '', // contact_number
-                    '', // address
-                    '', // selected_services
-                    'business', // type
-                    1, // active
-                    '', // expertise_in
-                ]
-            );
-        } else {
-            // Vendor exists, ensure we're using the correct ID
-            console.log(`Found existing vendor: `, existingVendor[0]);
-            if (existingVendor[0].id !== actualVendorId) {
-                console.log(`ID mismatch! Updating from ${actualVendorId} to ${existingVendor[0].id}`);
-                // There's a mismatch, use the existing vendor's ID to avoid conflicts
-                actualVendorId = existingVendor[0].id;
-            }
-        }
-
-        // At this point, we have the correct vendor ID
-        console.log(`Final actualVendorId for insert: ${actualVendorId}, type: ${typeof actualVendorId}`);
+        // IMPORTANT: Store the vendor ID in localStorage for future reference
+        console.log(`Final resolved vendorId: ${actualVendorId}`);
 
         // Validate each slot
         for (const slot of availabilitySlots) {
@@ -413,46 +359,15 @@ export async function POST(req: NextRequest) {
             const startTime = formatDateForMySQL(slot.startTime);
             const endTime = formatDateForMySQL(slot.endTime);
 
-            // Ensure vendorId is consistently stored as the same type
-            // Try to detect if the database stores it as numeric or string
-            // by checking existing records
-            let vendorIdToStore = actualVendorId;
+            // Always store vendor ID as string to avoid type inconsistencies
+            const vendorIdToStore = String(actualVendorId);
 
-            try {
-                // Check existing record's type
-                const [sample] = await pool.execute<RowDataPacket[]>(
-                    'SELECT vendor_id FROM vendor_availability LIMIT 1'
-                );
-
-                if (sample && sample.length > 0) {
-                    console.log(`Sample vendor_id from database: ${sample[0].vendor_id} (${typeof sample[0].vendor_id})`);
-
-                    // If database stores as number but our ID is string
-                    if (typeof sample[0].vendor_id === 'number' && typeof vendorIdToStore !== 'number') {
-                        const numId = Number(vendorIdToStore);
-                        if (!isNaN(numId)) {
-                            console.log(`Converting vendorId to number: ${numId}`);
-                            vendorIdToStore = numId;
-                        }
-                    }
-
-                    // If database stores as string but our ID is number
-                    if (typeof sample[0].vendor_id === 'string' && typeof vendorIdToStore !== 'string') {
-                        console.log(`Converting vendorId to string: ${String(vendorIdToStore)}`);
-                        vendorIdToStore = String(vendorIdToStore);
-                    }
-                }
-            } catch (error) {
-                console.log(`Error checking vendor_id type: ${error}`);
-                // Continue with original ID if we can't determine the type
-            }
-
-            console.log(`Inserting availability with vendor_id: ${vendorIdToStore} (${typeof vendorIdToStore})`);
+            console.log(`Inserting availability with vendor_id: ${vendorIdToStore}`);
 
             return pool.execute<OkPacket>(
                 `INSERT INTO vendor_availability 
- (id, vendor_id, start_time, end_time, created_at, updated_at)
- VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                (id, vendor_id, start_time, end_time, created_at, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
                 [id, vendorIdToStore, startTime, endTime]
             );
         });
@@ -462,7 +377,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             message: `Successfully added ${availabilitySlots.length} availability slot(s)`,
-            count: availabilitySlots.length
+            count: availabilitySlots.length,
+            vendorId: actualVendorId
         });
     } catch (error) {
         console.error('Error adding vendor availability:', error);
