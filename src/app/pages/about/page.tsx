@@ -40,7 +40,7 @@ export default function AboutPage() {
       name: "Abdul Hakeem",
       title: "Technology Advisor",
       expertise: "AI & Blockchain Solutions",
-      image: "/images/hakeem.avif",
+      image: "/images/hakeem.jpg",
       quote: "Precision in process creates freedom to innovate."
     },
     {
@@ -121,17 +121,15 @@ export default function AboutPage() {
             className="lg:w-1/2"
             initial={{ opacity: 0, x: -50 }}
             whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0 }}
             viewport={{ once: true }}
           >
             <div className="border-l-4 border-[#F59E0B] pl-6 mb-6 text-justify">
               
               <p className="text-lg text-gray-700">
-                To arm Sri Lankan entrepreneurs with the strategic weapons, tactical mentorship, 
-                and operational support needed to dominate their markets and build lasting empires.
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit. Sed voluptatem voluptas minima,
-                nostrum dolorem provident vel incidunt minus dolor qui quibusdam repellendus velit? Veritatis, 
-                laboriosam nobis quos ipsam odit ex?
+                To arm Sri Lankan entrepreneurs with strategic tools, tactical mentorship, and operational support needed to dominate their markets and build lasting empires. We are driven by a vision to see local innovators rise with confidence, equipped with the knowledge and resources to outperform competition and lead with purpose.
+
+<br></br><br></br>Through expert guidance, innovative thinking, and unwavering support, we help build resilient ventures that thrive in evolving markets. Our mission goes beyond business success — we aim to foster sustainable growth, empower bold leadership, and create a legacy of impactful entrepreneurship across Sri Lanka.
               </p>
               
             </div>
@@ -285,12 +283,12 @@ export default function AboutPage() {
           <p className="text-xl opacity-90 max-w-2xl mx-auto mb-10">
             Schedule your strategy session with our elite mentors today.
           </p>
-          <a
-            href="/bookingpage"
+          {/* <a
+            href="/pages/resourcese"
             className="inline-block bg-[#F59E0B] hover:bg-[#D97706] text-black px-10 py-4 rounded-lg font-bold text-lg uppercase tracking-wider shadow-lg transition-all"
           >
             Deploy Resources
-          </a>
+          </a> */}
         </div>
       </section>
 

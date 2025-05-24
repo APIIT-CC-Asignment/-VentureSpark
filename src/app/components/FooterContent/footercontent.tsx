@@ -40,10 +40,10 @@ const FooterContent = () => {
               Quick Links
             </h3>
             <ul className="space-y-3">
-              {['Home', 'Services', 'About', 'Team', 'Testimonials', 'Contact'].map((item) => (
+              {['Home',  'About', 'Services', 'Contact'].map((item) => (
                 <li key={item}>
                   <a 
-                    href="#" 
+                    href="/"
                     className="text-gray-400 hover:text-green-400 transition-colors duration-300 flex items-center"
                   >
                     <span className="w-1 h-1 bg-gray-500 rounded-full mr-2"></span>

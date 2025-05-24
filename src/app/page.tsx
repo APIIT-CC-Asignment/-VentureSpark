@@ -317,13 +317,13 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <a
-                href="/bookingpage"
+                href="/pages/booking"
                 className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-8 py-4 rounded-full font-semibold text-lg shadow-lg transition-all"
               >
                 Book Your First Session
               </a>
               <a
-                href="#"
+                href="/pages/about"
                 className="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-full font-semibold text-lg border border-white/20 transition-all"
               >
                 Learn More

@@ -69,11 +69,11 @@ export default function Resources() {
       description:
         "A step-by-step guide to testing your business concept before investing significant resources.",
       category: "entrepreneurship",
-      image: "/images/resources/validate-idea.jpg",
+      image: "/images/mihi.jpg",
       date: "2025-04-01",
       url: "#",
     },
-    {
+    { 
       id: 2,
       title: "Startup Funding Options in Sri Lanka",
       description:
