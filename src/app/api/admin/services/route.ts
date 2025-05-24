@@ -23,7 +23,7 @@ type Service = {
 export async function GET() {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT id, service_name, years_of_excellence, email, contact_number, address, selected_services, type, active, created_at, updated_at, expertise_in,status FROM vendor"
+      "SELECT id, service_name, years_of_excellence, email, contact_number, address, selected_services, type, active, created_at, updated_at, expertise_in,status FROM Vendor"
     );
 
     const services: Service[] = rows.map((row) => ({
