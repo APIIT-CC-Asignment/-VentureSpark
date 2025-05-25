@@ -162,23 +162,6 @@ export default function AdminDashboard() {
     setUsergroup(group);
   }, []);
 
-  useEffect(() => {
-    // If we're in a Cypress test environment, we want to bypass the redirect
-    // Cypress sets a special flag in localStorage
-    const isCypressTest = localStorage.getItem("cypress_test") === "true" ||
-      window.location.href.includes("cypress");
-
-    if (usergroup === "Admin") {
-      fetchDashboardData();
-    } else if (usergroup && usergroup !== "Admin" && !isCypressTest) {
-      // Only redirect if not in Cypress test and not an admin
-      router.push("/");
-    } else if (!usergroup && !isCypressTest) {
-      // If no usergroup is found and not in Cypress test, redirect to login
-      router.push("/pages/loginpage");
-    }
-  }, [usergroup, router]);
-
   const fetchData = async (url: string) => {
     const response = await fetch(url);
     if (!response.ok) {
@@ -207,6 +190,12 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (usergroup === "Admin") {
+      fetchDashboardData();
+    }
+  }, [usergroup]);
 
   const handleServiceStatusChange = async (
     serviceId: string,
