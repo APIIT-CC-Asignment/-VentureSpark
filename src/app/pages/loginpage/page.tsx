@@ -79,7 +79,7 @@ export default function LoginPage() {
           console.log("Redirecting to user profile...");
           redirectTo("/");
         } else if (data.typegroup === 'Admin') {
-          // Redirect admins to admin dashboard
+
           console.log("Redirecting to admin dashboard...");
           redirectTo("/pages/admin");
         } else {
