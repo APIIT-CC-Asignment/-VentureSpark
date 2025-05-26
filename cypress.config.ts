@@ -1,20 +1,32 @@
-import { defineConfig } from "cypress";
+import { defineConfig } from 'cypress';
 
 export default defineConfig({
-  e2e: {
-    setupNodeEvents(on, config) {
-      // implement node event listeners here
+    e2e: {
+        baseUrl: 'http://localhost:3000',
+        supportFile: 'cypress/support/e2e.ts',
+        specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
+        video: false,
+        screenshotOnRunFailure: true,
+        setupNodeEvents(on, config) {
+            // implement node event listeners here
+            on('task', {
+                log(message) {
+                    console.log(message);
+                    return null;
+                },
+            });
+        },
+        failOnStatusCode: false,
     },
-    baseUrl: 'http://localhost:3000',
     env: {
-      DB_HOST: 'localhost',
-      DB_USER: 'root',
-      DB_PASSWORD: '',
-      DB_NAME: 'venturespark',
-      DB_PORT: 3306,
-      JWT_SECRET: 'test_secret',
-      NEXTAUTH_URL: 'http://localhost:3000',
-      NEXTAUTH_SECRET: 'test_secret'
-    }
-  },
-})
+        apiUrl: 'http://localhost:3000/api',
+    },
+    retries: {
+        runMode: 2,
+        openMode: 0
+    },
+    defaultCommandTimeout: 10000,
+    pageLoadTimeout: 30000,
+    viewportWidth: 1280,
+    viewportHeight: 720,
+}); 
