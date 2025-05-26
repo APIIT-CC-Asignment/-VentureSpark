@@ -122,10 +122,88 @@ export async function GET(req: NextRequest) {
 
 // POST method - Create or update vendor profile
 export async function POST(req: NextRequest) {
+  let connection;
   try {
     const data = await req.json();
     console.log('POST to vendor API with data:', data);
 
+    // Handle registration case
+    if (data.password) {
+      // Get a connection for transaction
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      try {
+        // Check if user already exists
+        const [existingUsers] = await connection.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE email = ?',
+          [data.email]
+        );
+
+        if (existingUsers.length > 0) {
+          await connection.rollback();
+          return NextResponse.json(
+            { error: 'User with this email already exists' },
+            { status: 409 }
+          );
+        }
+
+        // Create user
+        const [userResult] = await connection.execute(
+          'INSERT INTO users (username, email, password, typegroup) VALUES (?, ?, ?, ?)',
+          [data.username, data.email, data.password, data.typegroup]
+        );
+
+        // Get the inserted user's ID
+        const [newUser] = await connection.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE email = ?',
+          [data.email]
+        );
+
+        if (!newUser || newUser.length === 0) {
+          await connection.rollback();
+          throw new Error('Failed to create user account');
+        }
+
+        const userId = newUser[0].id;
+
+        // Create vendor profile
+        await connection.execute(
+          `INSERT INTO Vendor 
+            (id, service_name, years_of_excellence, email, contact_number, address, selected_services, type, active, expertise_in)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            userId,
+            data.service_name,
+            data.years_of_excellence,
+            data.email,
+            data.contact_number,
+            data.address,
+            data.selected_services,
+            data.type,
+            data.active,
+            data.expertise_in
+          ]
+        );
+
+        // Commit the transaction
+        await connection.commit();
+
+        return NextResponse.json({
+          success: true,
+          message: 'Registration successful',
+          userId: userId
+        });
+      } catch (error) {
+        // Rollback the transaction on error
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }
+
+    // Handle existing vendor update case
     if (!data.id && !data.email) {
       return NextResponse.json({ error: 'Vendor ID or email is required' }, { status: 400 });
     }
@@ -144,7 +222,6 @@ export async function POST(req: NextRequest) {
       }
 
       vendorId = userRows[0].id;
-      console.log(`Resolved email ${data.email} to vendor ID ${vendorId}`);
     }
 
     // Check if vendor record exists in Vendor table
@@ -292,7 +369,7 @@ export async function POST(req: NextRequest) {
       vendorId
     });
   } catch (error) {
-    console.error('Error updating vendor:', error);
+    console.error('Error in vendor POST API:', error);
     return NextResponse.json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -30,7 +30,20 @@ export default function Signup() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          typegroup: "vendor",
+          service_name: "New Vendor",
+          years_of_excellence: 0,
+          contact_number: "To be updated",
+          address: "To be updated",
+          selected_services: "[]",
+          type: "Services",
+          active: true,
+          expertise_in: "To be updated"
+        }),
       });
 
       const data = await response.json();
@@ -45,7 +58,7 @@ export default function Signup() {
         // Store authentication data
         const authData = {
           isAuthenticated: true,
-          vendorId: formData.email, // Use email as vendorId for now
+          vendorId: formData.email,
           email: formData.email
         };
         localStorage.setItem("consultantAuth", JSON.stringify(authData));
@@ -65,8 +78,9 @@ export default function Signup() {
         }
       }
     } catch (error) {
-      setStatus("Error: Could not connect to server");
-      alert("Error: Could not connect to server");
+      const errorMessage = error instanceof Error ? error.message : "Registration failed";
+      setStatus(`Error: ${errorMessage}`);
+      alert(`Error: ${errorMessage}`);
     }
   };
 
