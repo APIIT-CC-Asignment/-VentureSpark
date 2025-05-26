@@ -156,7 +156,7 @@ export default function AboutPage() {
             className="lg:w-1/2 relative h-96 rounded-xl overflow-hidden shadow-2xl"
             initial={{ opacity: 0, x: 50 }}
             whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0 }}
             viewport={{ once: true }}
           >
             <Image

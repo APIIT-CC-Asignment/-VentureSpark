@@ -1,4 +1,4 @@
-// src/app/resources/page.tsx
+
 "use client";
 
 import { motion } from "framer-motion";
@@ -69,17 +69,17 @@ export default function Resources() {
       description:
         "A step-by-step guide to testing your business concept before investing significant resources.",
       category: "entrepreneurship",
-      image: "/images/mihi.jpg",
+      image: "/images/r1.jpg",
       date: "2025-04-01",
       url: "#",
     },
-    { 
+    {
       id: 2,
       title: "Startup Funding Options in Sri Lanka",
       description:
         "Comprehensive overview of equity, debt, grants, and alternative financing available locally.",
       category: "funding",
-      image: "/images/resources/funding.jpg",
+      image: "/images/r2.jpg",
       date: "2025-03-22",
       url: "#",
     },
@@ -89,7 +89,7 @@ export default function Resources() {
       description:
         "Learn the strategies to create an MVP that addresses real customer pain points.",
       category: "product",
-      image: "/images/resources/mvp.jpg",
+      image: "/images/r3.jpg",
       date: "2025-03-15",
       url: "#",
     },
@@ -99,7 +99,7 @@ export default function Resources() {
       description:
         "Strategic approaches to scaling operations, team, and customer base sustainably.",
       category: "growth",
-      image: "/images/resources/scaling.jpg",
+      image: "/images/r4.jpg",
       date: "2025-03-10",
       url: "#",
     },
@@ -109,7 +109,7 @@ export default function Resources() {
       description:
         "Optimize your tax position while maintaining full compliance with local regulations.",
       category: "tax",
-      image: "/images/resources/tax-planning.jpg",
+      image: "/images/r5.jpg",
       date: "2025-03-05",
       url: "#",
     },
@@ -119,7 +119,7 @@ export default function Resources() {
       description:
         "Cost-effective approaches to building brand awareness and acquiring customers.",
       category: "marketing",
-      image: "/images/resources/digital-marketing.jpg",
+      image: "/images/r6.jpg",
       date: "2025-02-28",
       url: "#",
     },
@@ -189,7 +189,7 @@ export default function Resources() {
       description:
         "Legally reviewed investment agreement template for early-stage funding rounds.",
       category: "legal",
-      image: "/images/resources/legal-doc.jpg",
+      image: "/images/s1.jpg",
       downloadUrl: "#",
     },
     {
@@ -198,7 +198,7 @@ export default function Resources() {
       description:
         "Complete set of employment contracts, offer letters, and onboarding documents.",
       category: "hr",
-      image: "/images/resources/hiring-doc.jpg",
+      image: "/images/s2.jpg",
       downloadUrl: "#",
     },
     {
@@ -207,7 +207,7 @@ export default function Resources() {
       description:
         "Comprehensive Excel model with revenue projections, burn rate, and key SaaS metrics.",
       category: "finance",
-      image: "/images/resources/finance-doc.jpg",
+      image: "/images/s3.jpg",
       downloadUrl: "#",
     },
     {
@@ -216,7 +216,7 @@ export default function Resources() {
       description:
         "Strategic framework for planning, executing, and measuring marketing initiatives.",
       category: "marketing",
-      image: "/images/resources/marketing-doc.jpg",
+      image: "/images/s4.jpg",
       downloadUrl: "#",
     },
     {
@@ -225,7 +225,7 @@ export default function Resources() {
       description:
         "Professional slide deck template designed to impress investors and showcase your vision.",
       category: "funding",
-      image: "/images/resources/pitch-deck.jpg",
+      image: "/images/s5.jpg",
       downloadUrl: "#",
     },
     {
@@ -234,7 +234,7 @@ export default function Resources() {
       description:
         "Visual roadmap template to plan and communicate your product development strategy.",
       category: "product",
-      image: "/images/resources/roadmap-doc.jpg",
+      image: "/images/s6.jpg",
       downloadUrl: "#",
     },
   ];
@@ -248,7 +248,7 @@ export default function Resources() {
       source: "Tech Daily",
       date: "2025-04-10",
       url: "#",
-      image: "/images/resources/innovation-fund.jpg",
+      image: "/images/t1.jpg",
     },
     {
       id: 2,
@@ -258,7 +258,7 @@ export default function Resources() {
       source: "Startup Journal",
       date: "2025-04-05",
       url: "#",
-      image: "/images/resources/fintech-news.jpg",
+      image: "/images/t2.jpg",
     },
     {
       id: 3,
@@ -268,7 +268,7 @@ export default function Resources() {
       source: "Business Insider",
       date: "2025-03-28",
       url: "#",
-      image: "/images/resources/tech-hub.jpg",
+      image: "/images/t3.jpg",
     },
     {
       id: 4,
@@ -278,7 +278,7 @@ export default function Resources() {
       source: "Digital Economy Report",
       date: "2025-03-20",
       url: "#",
-      image: "/images/resources/ecommerce.jpg",
+      image: "/images/t4.jpg",
     },
   ];
 
@@ -332,7 +332,6 @@ export default function Resources() {
     const term = searchTerm.toLowerCase();
 
     return items.filter((item) => {
-      // Search in all string properties of an item
       return Object.keys(item).some((key) => {
         if (typeof item[key] === "string") {
           return item[key].toLowerCase().includes(term);
@@ -378,7 +377,6 @@ export default function Resources() {
         break;
       case "news":
         items = news;
-
         break;
       case "tax":
         items = taxUpdates;
@@ -393,7 +391,6 @@ export default function Resources() {
 
   // For filtering categories
   useEffect(() => {
-    // Reset filter when changing sections
     setActiveFilter("all");
   }, [activeSection]);
 
@@ -513,9 +510,17 @@ export default function Resources() {
                     transition={{ duration: 0.5, delay: article.id * 0.1 }}
                   >
                     <div className="h-48 bg-gray-200 relative">
-                      <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
-                        <span>Image: {article.image}</span>
-                      </div>
+                      <Image
+                        src={article.image}
+                        alt={article.title}
+                        fill
+                        style={{ objectFit: "cover" }}
+                        className="rounded-t-xl"
+                        priority={article.id <= 3} // Prioritize first 3 images for above-the-fold
+                        onError={(e) => {
+                          e.currentTarget.src = "/images/fallback.jpg";
+                        }}
+                      />
                       <div className="absolute top-4 left-4 bg-[#10B981]/90 text-white text-xs px-2 py-1 rounded-full">
                         {article.category}
                       </div>
@@ -524,9 +529,7 @@ export default function Resources() {
                       <h3 className="text-xl font-bold text-[#1E3A8A] mb-2">
                         {article.title}
                       </h3>
-                      <p className="text-gray-600 mb-4">
-                        {article.description}
-                      </p>
+                      <p className="text-gray-600 mb-4">{article.description}</p>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-500">
                           {new Date(article.date).toLocaleDateString()}
@@ -556,9 +559,21 @@ export default function Resources() {
                     transition={{ duration: 0.5, delay: tool.id * 0.1 }}
                   >
                     <div className="w-12 h-12 bg-[#1E3A8A]/10 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                      {/* Option 1: Keep text-based icon */}
                       <div className="text-[#1E3A8A] text-lg font-bold">
                         {tool.name.charAt(0)}
                       </div>
+                      {/* Option 2: Use Image component for icons (uncomment to use) */}
+                      {/* <Image
+                        src={tool.icon}
+                        alt={tool.name}
+                        width={32}
+                        height={32}
+                        style={{ objectFit: "contain" }}
+                        onError={(e) => {
+                          e.currentTarget.src = "/images/fallback.jpg";
+                        }}
+                      /> */}
                     </div>
                     <div>
                       <div className="text-xs font-medium text-[#10B981] uppercase mb-1">
@@ -594,9 +609,17 @@ export default function Resources() {
                     transition={{ duration: 0.5, delay: template.id * 0.1 }}
                   >
                     <div className="h-32 bg-gray-100 relative">
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <span>Template Preview: {template.image}</span>
-                      </div>
+                      <Image
+                        src={template.image}
+                        alt={template.name}
+                        fill
+                        style={{ objectFit: "cover" }}
+                        className="rounded-t-xl"
+                        priority={template.id <= 3}
+                        onError={(e) => {
+                          e.currentTarget.src = "/images/fallback.jpg";
+                        }}
+                      />
                     </div>
                     <div className="p-6">
                       <div className="flex justify-between items-center mb-2">
@@ -633,10 +656,18 @@ export default function Resources() {
                     animate="visible"
                     transition={{ duration: 0.5, delay: item.id * 0.1 }}
                   >
-                    <div className="w-full md:w-1/4 h-48 md:h-auto bg-gray-200 rounded-lg overflow-hidden">
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <span>Image: {item.image}</span>
-                      </div>
+                    <div className="w-full md:w-1/4 h-48 md:h-auto bg-gray-200 rounded-lg overflow-hidden relative">
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        style={{ objectFit: "cover" }}
+                        className="rounded-lg"
+                        priority={item.id <= 2}
+                        onError={(e) => {
+                          e.currentTarget.src = "/images/fallback.jpg";
+                        }}
+                      />
                     </div>
                     <div className="md:w-3/4">
                       <div className="flex items-center text-sm text-gray-500 mb-2">
@@ -657,10 +688,7 @@ export default function Resources() {
                     </div>
                   </motion.div>
                 ))}
-
-                
               </div>
-              
             )}
 
             {activeSection === "tax" && (
@@ -738,8 +766,6 @@ export default function Resources() {
         </div>
       </section>
 
-
-
       {/* Newsletter Section */}
       <section className="py-16 bg-[#1E3A8A]/5">
         <div className="container mx-auto px-6">
@@ -787,30 +813,29 @@ export default function Resources() {
         </div>
       </section>
 
-
       <section className="py-16 bg-white">
-  <div className="container mx-auto px-4 sm:px-6">
-    <div className="max-w-4xl mx-auto bg-gradient-to-r from-blue-800 to-emerald-500 rounded-2xl shadow-lg p-6 md:p-8 text-white">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
-        <div className="text-center md:text-left">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3">Latest News</h2>
-          <p className="opacity-90 mb-4 max-w-md">
-            Stay updated with the latest articles, tools, and resources 
-            that can help entrepreneurs grow their business.
-          </p>
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="max-w-4xl mx-auto bg-gradient-to-r from-blue-800 to-emerald-500 rounded-2xl shadow-lg p-6 md:p-8 text-white">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
+              <div className="text-center md:text-left">
+                <h2 className="text-2xl md:text-3xl font-bold mb-3">Latest News</h2>
+                <p className="opacity-90 mb-4 max-w-md">
+                  Stay updated with the latest articles, tools, and resources
+                  that can help entrepreneurs grow their business.
+                </p>
+              </div>
+              <div className="w-full md:w-auto">
+                <a
+                  href="/pages/News"
+                  className="bg-white text-blue-800 px-6 py-3 rounded-full font-medium inline-block hover:bg-gray-100 transition-colors duration-300 shadow-md w-full md:w-auto text-center"
+                >
+                  View All News
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="w-full md:w-auto">
-          <a
-            href="/pages/News"
-            className="bg-white text-blue-800 px-6 py-3 rounded-full font-medium inline-block hover:bg-gray-100 transition-colors duration-300 shadow-md w-full md:w-auto text-center"
-          >
-            View All News
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+      </section>
 
       {/* Suggestion Box */}
       <section className="py-16 bg-white">
