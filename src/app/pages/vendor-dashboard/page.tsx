@@ -30,6 +30,9 @@ import {
   MoreVerticalIcon,
   Home
 } from 'lucide-react';
+import { config } from '../../lib/config';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Updated interfaces based on actual table structure
 interface VendorBasicInfo {
@@ -145,6 +148,40 @@ const VendorDashboard: React.FC = () => {
   const [sessions, setSessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionStatusFilter, setSessionStatusFilter] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+
+  // OAuth callback handler
+  useEffect(() => {
+    const handleOAuthCallback = () => {
+      const url = new URL(window.location.href);
+      const accessToken = url.searchParams.get('access_token');
+      const refreshToken = url.searchParams.get('refresh_token');
+      const error = url.searchParams.get('error');
+
+      if (error) {
+        console.error('OAuth error:', error);
+        toast.error('Failed to connect to Google Calendar');
+        // Clean up URL
+        window.history.replaceState({}, document.title, '/pages/vendor-dashboard');
+        return;
+      }
+
+      if (accessToken) {
+        // Store tokens
+        localStorage.setItem('google_access_token', accessToken);
+        if (refreshToken) {
+          localStorage.setItem('google_refresh_token', refreshToken);
+        }
+        toast.success('Successfully connected to Google Calendar');
+        // Clean up URL
+        window.history.replaceState({}, document.title, '/pages/vendor-dashboard');
+      }
+    };
+
+    handleOAuthCallback();
+  }, []);
 
   // Helper function to format status
   const formatDateTime = (dateTime: string) => {
@@ -1211,63 +1248,95 @@ const VendorDashboard: React.FC = () => {
 
   // Function to fetch sessions
   const fetchSessions = async () => {
-    if (!auth.vendorId) return;
-
-    setSessionsLoading(true);
     try {
+      setLoading(true);
       const response = await fetch(`/api/vendor-sessions?vendorId=${auth.vendorId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data);
-      } else {
-        setFeedback({ type: 'error', message: 'Failed to load sessions. Please try again.' });
+      if (!response.ok) {
+        throw new Error('Failed to fetch sessions');
       }
+      const data = await response.json();
+      setSessions(data);
     } catch (error) {
       console.error('Error fetching sessions:', error);
-      setFeedback({ type: 'error', message: 'Failed to load sessions. Please try again.' });
+      setError('Failed to fetch sessions');
     } finally {
-      setSessionsLoading(false);
+      setLoading(false);
     }
   };
 
   // Function to update session status
-  const updateSessionStatus = async (sessionId: string, status: 'confirmed' | 'completed' | 'cancelled') => {
-    if (!auth.vendorId) return;
-
+  const updateSessionStatus = async (sessionId: string, status: string) => {
     try {
-      setFeedback({ type: 'info', message: 'Updating session status...' });
+      // Check if we need to request Google Calendar access
+      if (status === 'confirmed') {
+        const hasGoogleAccess = localStorage.getItem('google_access_token');
+
+        if (!hasGoogleAccess) {
+          // Ensure client ID is available
+          if (!config.google.clientId) {
+            console.error('Google Client ID is not configured');
+            toast.error('Google Calendar integration is not properly configured');
+            return;
+          }
+
+          // Log the configuration being used
+          console.log('Initiating Google OAuth with config:', {
+            clientId: config.google.clientId,
+            redirectUri: config.google.redirectUri,
+            scopes: config.google.scopes
+          });
+
+          // Construct the authorization URL with all required parameters
+          const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+          authUrl.searchParams.append('client_id', config.google.clientId);
+          authUrl.searchParams.append('redirect_uri', config.google.redirectUri);
+          authUrl.searchParams.append('response_type', 'code');
+          authUrl.searchParams.append('scope', config.google.scopes.join(' '));
+          authUrl.searchParams.append('access_type', 'offline');
+          authUrl.searchParams.append('prompt', 'consent');
+
+          console.log('Redirecting to Google OAuth URL:', authUrl.toString());
+          window.location.href = authUrl.toString();
+          return;
+        }
+      }
 
       const response = await fetch('/api/vendor-sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           sessionId,
-          vendorId: auth.vendorId,
-          status
-        })
+          vendorId: auth.email,
+          status,
+          accessToken: localStorage.getItem('google_access_token')
+        }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setFeedback({ type: 'success', message: data.message });
-        // Update the session in the local state
-        setSessions(prevSessions =>
-          prevSessions.map(session =>
-            session.id === sessionId
-              ? { ...session, status }
-              : session
-          )
+      if (!response.ok) {
+        throw new Error('Failed to update session status');
+      }
+
+      const data = await response.json();
+
+      // If calendar event was created, show success message with Meet link
+      if (data.calendarEvent) {
+        toast.success(
+          <div>
+            <p>Session confirmed and calendar event created!</p>
+            <p>Google Meet Link: <a href={data.calendarEvent.meetLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Join Meeting</a></p>
+          </div>
         );
       } else {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update session status');
+        toast.success(`Session ${status === 'confirmed' ? 'accepted' : status === 'completed' ? 'marked as completed' : 'rejected'} successfully`);
       }
+
+      // Refresh the sessions list
+      fetchSessions();
     } catch (error) {
       console.error('Error updating session status:', error);
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to update session status'
-      });
+      toast.error('Failed to update session status');
     }
   };
 
@@ -1320,640 +1389,653 @@ const VendorDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Enhanced Modern Sidebar */}
-      <div className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-gradient-to-b from-[#1E3A8A] to-[#10B981] shadow-xl transition-all duration-300 ease-in-out relative`}>
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-8">
-            <div className={`flex items-center ${sidebarOpen ? '' : 'justify-center'} transition-all duration-300`}>
-              <div className="w-10 h-10 bg-white rounded-xl mr-3 flex items-center justify-center shadow-lg">
-                <span className="text-lg font-bold text-[#1E3A8A]">V</span>
+    <div className="min-h-screen bg-gray-100">
+      <ToastContainer position="top-right" autoClose={5000} />
+      <div className="min-h-screen bg-gray-50 flex">
+        {/* Enhanced Modern Sidebar */}
+        <div className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-gradient-to-b from-[#1E3A8A] to-[#10B981] shadow-xl transition-all duration-300 ease-in-out relative`}>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-8">
+              <div className={`flex items-center ${sidebarOpen ? '' : 'justify-center'} transition-all duration-300`}>
+                <div className="w-10 h-10 bg-white rounded-xl mr-3 flex items-center justify-center shadow-lg">
+                  <span className="text-lg font-bold text-[#1E3A8A]">V</span>
+                </div>
+                {sidebarOpen && <span className="text-xl font-bold text-white">{vendorInfo?.username}'s Dashboard</span>}
               </div>
-              {sidebarOpen && <span className="text-xl font-bold text-white">{vendorInfo?.username}'s Dashboard</span>}
-            </div>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-white hover:text-gray-200 transition-colors p-2 rounded-lg hover:bg-white/10"
-            >
-              {sidebarOpen ? <ChevronLeftIcon className="w-5 h-5" /> : <ChevronRightIcon className="w-5 h-5" />}
-            </button>
-          </div>
-
-          <nav className="space-y-2">
-            {sidebarItems.map((item) => (
               <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id)}
-                className={`w-full flex items-center p-4 rounded-xl transition-all duration-200 ${activeTab === item.id
-                  ? 'bg-white text-[#1E3A8A] shadow-lg transform scale-105 font-semibold'
-                  : 'text-white hover:bg-white/10 hover:shadow-md'
-                  }`}
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="text-white hover:text-gray-200 transition-colors p-2 rounded-lg hover:bg-white/10"
               >
-                <div className={`${activeTab === item.id ? 'scale-110' : ''} transition-transform duration-200`}>
-                  {item.icon}
-                </div>
-                {sidebarOpen && <span className="ml-3 font-medium">{item.label}</span>}
-                {!sidebarOpen && activeTab === item.id && (
-                  <div className="absolute left-24 bg-white text-[#1E3A8A] px-3 py-1 rounded-md shadow-lg z-50">
-                    <span className="text-sm whitespace-nowrap">{item.label}</span>
-                    <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 border-r-4 border-r-white border-y-4 border-y-transparent"></div>
-                  </div>
-                )}
+                {sidebarOpen ? <ChevronLeftIcon className="w-5 h-5" /> : <ChevronRightIcon className="w-5 h-5" />}
               </button>
-            ))}
-          </nav>
-        </div>
+            </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/20">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center p-4 text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-          >
-            <LogOutIcon className="w-5 h-5" />
-            {sidebarOpen && <span className="ml-3 font-medium">Logout</span>}
-          </button>
-        </div>
-
-        {/* Expand Button when collapsed */}
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute -right-4 top-8 bg-white shadow-lg border border-gray-200 p-2 rounded-full hover:shadow-xl transition-all"
-          >
-            <ChevronRightIcon className="w-4 h-4 text-[#1E3A8A]" />
-          </button>
-        )}
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Enhanced Top Bar */}
-        <header className="bg-gradient-to-r from-[#1E3A8A]/10 to-[#10B981]/10 shadow-sm border-b border-gray-200 h-20 flex items-center justify-between px-8">
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-[#1E3A8A]">
-              {sidebarItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
-            </h1>
+            <nav className="space-y-2">
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleTabChange(item.id)}
+                  className={`w-full flex items-center p-4 rounded-xl transition-all duration-200 ${activeTab === item.id
+                    ? 'bg-white text-[#1E3A8A] shadow-lg transform scale-105 font-semibold'
+                    : 'text-white hover:bg-white/10 hover:shadow-md'
+                    }`}
+                >
+                  <div className={`${activeTab === item.id ? 'scale-110' : ''} transition-transform duration-200`}>
+                    {item.icon}
+                  </div>
+                  {sidebarOpen && <span className="ml-3 font-medium">{item.label}</span>}
+                  {!sidebarOpen && activeTab === item.id && (
+                    <div className="absolute left-24 bg-white text-[#1E3A8A] px-3 py-1 rounded-md shadow-lg z-50">
+                      <span className="text-sm whitespace-nowrap">{item.label}</span>
+                      <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 border-r-4 border-r-white border-y-4 border-y-transparent"></div>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </nav>
           </div>
-          <div className="flex items-center space-x-6">
-            <button className="p-3 text-[#1E3A8A] hover:bg-gray-100 rounded-lg transition-colors">
-              <SearchIcon className="w-5 h-5" />
-            </button>
 
-            {vendorInfo && (
-              <div className="flex items-center space-x-3">
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-[#1E3A8A]">{vendorInfo.username}</p>
-                  <p className="text-xs text-gray-600">{vendorInfo.email}</p>
+          <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/20">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center p-4 text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+            >
+              <LogOutIcon className="w-5 h-5" />
+              {sidebarOpen && <span className="ml-3 font-medium">Logout</span>}
+            </button>
+          </div>
+
+          {/* Expand Button when collapsed */}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="absolute -right-4 top-8 bg-white shadow-lg border border-gray-200 p-2 rounded-full hover:shadow-xl transition-all"
+            >
+              <ChevronRightIcon className="w-4 h-4 text-[#1E3A8A]" />
+            </button>
+          )}
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Enhanced Top Bar */}
+          <header className="bg-gradient-to-r from-[#1E3A8A]/10 to-[#10B981]/10 shadow-sm border-b border-gray-200 h-20 flex items-center justify-between px-8">
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-[#1E3A8A]">
+                {sidebarItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
+              </h1>
+            </div>
+            <div className="flex items-center space-x-6">
+              <button className="p-3 text-[#1E3A8A] hover:bg-gray-100 rounded-lg transition-colors">
+                <SearchIcon className="w-5 h-5" />
+              </button>
+
+              {vendorInfo && (
+                <div className="flex items-center space-x-3">
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-[#1E3A8A]">{vendorInfo.username}</p>
+                    <p className="text-xs text-gray-600">{vendorInfo.email}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#1E3A8A] to-[#10B981] rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                    {vendorInfo.username.charAt(0).toUpperCase()}
+                  </div>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-[#1E3A8A] to-[#10B981] rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                  {vendorInfo.username.charAt(0).toUpperCase()}
+              )}
+
+              {getVerificationStatusDisplay()}
+
+              <div className="relative bg-gray-100 rounded-lg p-3">
+                <div className="w-36 h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#1E3A8A] to-[#10B981] transition-all duration-700 rounded-full"
+                    style={{ width: `${calculateCompletionPercentage()}%` }}
+                  ></div>
+                </div>
+                <span className="absolute -top-6 right-0 text-xs font-semibold text-[#1E3A8A]">
+                  {calculateCompletionPercentage()}% Complete
+                </span>
+              </div>
+            </div>
+          </header>
+
+          {/* Content Area */}
+          <main className="flex-1 overflow-auto bg-gray-50 p-8">
+            {feedback.message && (
+              <div
+                className={`mb-6 p-4 rounded-xl border ${feedback.type === 'error'
+                  ? 'bg-red-50 text-red-800 border-red-200'
+                  : feedback.type === 'info'
+                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  } animate-fadeIn shadow-sm`}
+              >
+                <div className="flex items-center">
+                  {feedback.type === 'error' ? (
+                    <XCircleIcon className="w-5 h-5 mr-2" />
+                  ) : feedback.type === 'info' ? (
+                    <AlertCircleIcon className="w-5 h-5 mr-2" />
+                  ) : (
+                    <CheckCircleIcon className="w-5 h-5 mr-2" />
+                  )}
+                  <span className="font-medium">{feedback.message}</span>
                 </div>
               </div>
             )}
 
-            {getVerificationStatusDisplay()}
-
-            <div className="relative bg-gray-100 rounded-lg p-3">
-              <div className="w-36 h-3 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-[#1E3A8A] to-[#10B981] transition-all duration-700 rounded-full"
-                  style={{ width: `${calculateCompletionPercentage()}%` }}
-                ></div>
-              </div>
-              <span className="absolute -top-6 right-0 text-xs font-semibold text-[#1E3A8A]">
-                {calculateCompletionPercentage()}% Complete
-              </span>
-            </div>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <main className="flex-1 overflow-auto bg-gray-50 p-8">
-          {feedback.message && (
-            <div
-              className={`mb-6 p-4 rounded-xl border ${feedback.type === 'error'
-                ? 'bg-red-50 text-red-800 border-red-200'
-                : feedback.type === 'info'
-                  ? 'bg-blue-50 text-blue-800 border-blue-200'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                } animate-fadeIn shadow-sm`}
-            >
-              <div className="flex items-center">
-                {feedback.type === 'error' ? (
-                  <XCircleIcon className="w-5 h-5 mr-2" />
-                ) : feedback.type === 'info' ? (
-                  <AlertCircleIcon className="w-5 h-5 mr-2" />
-                ) : (
-                  <CheckCircleIcon className="w-5 h-5 mr-2" />
-                )}
-                <span className="font-medium">{feedback.message}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Dashboard Content */}
-          {activeTab === 'dashboard' && (
-            <div className="space-y-8">
-              {/* Welcome Section */}
-              <div className="bg-gradient-to-r from-[#1E3A8A] to-[#10B981] rounded-2xl p-8 text-white border border-gray-200 shadow-lg">
-                <h2 className="text-3xl font-bold mb-2">
-                  Welcome back, {vendorInfo?.username}! 👋
-                </h2>
-                <p className="text-lg font-medium">
-                  Here's your vendor dashboard overview. Ready to grow your business?
-                </p>
-              </div>
-
-              {/* Enhanced Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-105">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl flex items-center justify-center">
-                      <BarChart3Icon className="w-7 h-7 text-blue-600" />
-                    </div>
-                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">+12%</span>
-                  </div>
-                  <h3 className="text-sm font-semibold text-black mb-1">Profile Completion</h3>
-                  <p className="text-3xl font-bold text-black">{calculateCompletionPercentage()}%</p>
-                  <p className="text-xs text-gray-600 mt-1">Keep building your profile</p>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-105">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl flex items-center justify-center">
-                      <CheckCircleIcon className="w-7 h-7 text-emerald-600" />
-                    </div>
-                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">Status</span>
-                  </div>
-                  <h3 className="text-sm font-semibold text-black mb-1">Verification Status</h3>
-                  <p className="text-3xl font-bold text-black">
-                    {formatVerificationStatus(vendorProfile?.verification_status)}
+            {/* Dashboard Content */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-8">
+                {/* Welcome Section */}
+                <div className="bg-gradient-to-r from-[#1E3A8A] to-[#10B981] rounded-2xl p-8 text-white border border-gray-200 shadow-lg">
+                  <h2 className="text-3xl font-bold mb-2">
+                    Welcome back, {vendorInfo?.username}! 👋
+                  </h2>
+                  <p className="text-lg font-medium">
+                    Here's your vendor dashboard overview. Ready to grow your business?
                   </p>
-                  <p className="text-xs text-gray-600 mt-1">Account verification</p>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-105">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl flex items-center justify-center">
-                      <BuildingIcon className="w-7 h-7 text-purple-600" />
+                {/* Enhanced Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-105">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl flex items-center justify-center">
+                        <BarChart3Icon className="w-7 h-7 text-blue-600" />
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">+12%</span>
                     </div>
-                    <span className="text-xs font-bold text-gray-600 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">Years</span>
+                    <h3 className="text-sm font-semibold text-black mb-1">Profile Completion</h3>
+                    <p className="text-3xl font-bold text-black">{calculateCompletionPercentage()}%</p>
+                    <p className="text-xs text-gray-600 mt-1">Keep building your profile</p>
                   </div>
-                  <h3 className="text-sm font-semibold text-black mb-1">Business Experience</h3>
-                  <p className="text-3xl font-bold text-black">{vendorProfile?.years_in_business || 0}+</p>
-                  <p className="text-xs text-gray-600 mt-1">Years in business</p>
+
+                  <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-105">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl flex items-center justify-center">
+                        <CheckCircleIcon className="w-7 h-7 text-emerald-600" />
+                      </div>
+                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">Status</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-black mb-1">Verification Status</h3>
+                    <p className="text-3xl font-bold text-black">
+                      {formatVerificationStatus(vendorProfile?.verification_status)}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">Account verification</p>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-105">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl flex items-center justify-center">
+                        <BuildingIcon className="w-7 h-7 text-purple-600" />
+                      </div>
+                      <span className="text-xs font-bold text-gray-600 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">Years</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-black mb-1">Business Experience</h3>
+                    <p className="text-3xl font-bold text-black">{vendorProfile?.years_in_business || 0}+</p>
+                    <p className="text-xs text-gray-600 mt-1">Years in business</p>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+                  <h3 className="text-xl font-bold text-black mb-6">Quick Actions</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button
+                      onClick={() => setActiveTab('profile')}
+                      className="flex items-center justify-center p-5 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
+                    >
+                      <UserIcon className="w-5 h-5 mr-2" />
+                      Complete Profile
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('availability')}
+                      className="flex items-center justify-center p-5 bg-gray-100 text-black rounded-xl hover:bg-gray-200 transition-all shadow-md hover:shadow-lg font-semibold"
+                    >
+                      <CalendarIcon className="w-5 h-5 mr-2" />
+                      Set Availability
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('sessions')}
+                      className="flex items-center justify-center p-5 bg-gray-100 text-black rounded-xl hover:bg-gray-200 transition-all shadow-md hover:shadow-lg font-semibold"
+                    >
+                      <ClockIcon className="w-5 h-5 mr-2" />
+                      View Sessions
+                    </button>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Quick Actions */}
-              <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-                <h3 className="text-xl font-bold text-black mb-6">Quick Actions</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <button
-                    onClick={() => setActiveTab('profile')}
-                    className="flex items-center justify-center p-5 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
-                  >
-                    <UserIcon className="w-5 h-5 mr-2" />
-                    Complete Profile
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('availability')}
-                    className="flex items-center justify-center p-5 bg-gray-100 text-black rounded-xl hover:bg-gray-200 transition-all shadow-md hover:shadow-lg font-semibold"
-                  >
-                    <CalendarIcon className="w-5 h-5 mr-2" />
-                    Set Availability
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('sessions')}
-                    className="flex items-center justify-center p-5 bg-gray-100 text-black rounded-xl hover:bg-gray-200 transition-all shadow-md hover:shadow-lg font-semibold"
-                  >
-                    <ClockIcon className="w-5 h-5 mr-2" />
-                    View Sessions
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Enhanced Profile Tab */}
-          {activeTab === 'profile' && vendorProfile && vendorInfo && (
-            <div className="space-y-8">
-              <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h2 className="text-3xl font-bold text-black">Vendor Profile</h2>
-                    <p className="text-gray-600 mt-2 text-lg">Manage your business information and profile details</p>
-                  </div>
-                  <div className="flex space-x-3">
-                    {isEditing ? (
-                      <>
+            {/* Enhanced Profile Tab */}
+            {activeTab === 'profile' && vendorProfile && vendorInfo && (
+              <div className="space-y-8">
+                <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h2 className="text-3xl font-bold text-black">Vendor Profile</h2>
+                      <p className="text-gray-600 mt-2 text-lg">Manage your business information and profile details</p>
+                    </div>
+                    <div className="flex space-x-3">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={handleProfileCancel}
+                            className="px-6 py-3 border-2 border-gray-300 rounded-xl text-black hover:bg-gray-50 font-semibold transition-all"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleProfileSave}
+                            disabled={isSubmitting}
+                            className="px-6 py-3 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-black rounded-xl hover:opacity-90 disabled:opacity-50 font-semibold shadow-lg"
+                          >
+                            {isSubmitting ? 'Saving...' : 'Save Changes'}
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          onClick={handleProfileCancel}
-                          className="px-6 py-3 border-2 border-gray-300 rounded-xl text-black hover:bg-gray-50 font-semibold transition-all"
+                          onClick={handleProfileEdit}
+                          className="px-6 py-3 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-black rounded-xl hover:opacity-90 font-semibold shadow-lg"
                         >
-                          Cancel
+                          <EditIcon className="w-4 h-4 inline mr-2" />
+                          Edit Profile
                         </button>
-                        <button
-                          onClick={handleProfileSave}
-                          disabled={isSubmitting}
-                          className="px-6 py-3 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-black rounded-xl hover:opacity-90 disabled:opacity-50 font-semibold shadow-lg"
-                        >
-                          {isSubmitting ? 'Saving...' : 'Save Changes'}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={handleProfileEdit}
-                        className="px-6 py-3 bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-black rounded-xl hover:opacity-90 font-semibold shadow-lg"
-                      >
-                        <EditIcon className="w-4 h-4 inline mr-2" />
-                        Edit Profile
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Basic Information */}
-                  <div className="space-y-6">
-                    <h3 className="text-xl font-bold text-black border-b border-gray-200 pb-2">Basic Information</h3>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Username</label>
-                      <input
-                        type="text"
-                        value={vendorInfo.username}
-                        disabled
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-black font-medium"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Email</label>
-                      <input
-                        type="email"
-                        value={vendorInfo.email}
-                        disabled
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-black font-medium"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Service Name</label>
-                      <input
-                        type="text"
-                        value={vendorInfo.service_name || ''}
-                        disabled={!isEditing}
-                        onChange={handleServiceNameChange}
-                        placeholder="Enter your business name"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Contact Number</label>
-                      <input
-                        type="text"
-                        value={vendorInfo.contact_number || ''}
-                        disabled={!isEditing}
-                        onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, contact_number: e.target.value })}
-                        placeholder="Enter contact number"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Expertise</label>
-                      <input
-                        type="text"
-                        value={vendorInfo.expertise_in || ''}
-                        disabled={!isEditing}
-                        onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, expertise_in: e.target.value })}
-                        placeholder="e.g., Business Strategy, Marketing"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Years of Excellence</label>
-                      <input
-                        type="number"
-                        value={vendorInfo.years_of_excellence || 0}
-                        disabled={!isEditing}
-                        onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, years_of_excellence: parseInt(e.target.value) || 0 })}
-                        placeholder="Years of experience"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Address</label>
-                      <textarea
-                        value={vendorInfo.address || ''}
-                        disabled={!isEditing}
-                        onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, address: e.target.value })}
-                        placeholder="Enter business address"
-                        rows={3}
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
+                      )}
                     </div>
                   </div>
 
-                  {/* Business Details */}
-                  <div className="space-y-6">
-                    <h3 className="text-xl font-bold text-black border-b border-gray-200 pb-2">Business Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Basic Information */}
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-bold text-black border-b border-gray-200 pb-2">Basic Information</h3>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Website URL</label>
-                      <input
-                        type="url"
-                        value={editableProfile?.website_url || ''}
-                        onChange={(e) => setEditableProfile(prev => prev ? { ...prev, website_url: e.target.value } : null)}
-                        disabled={!isEditing}
-                        placeholder="https://yourwebsite.com"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Username</label>
+                        <input
+                          type="text"
+                          value={vendorInfo.username}
+                          disabled
+                          className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-black font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Email</label>
+                        <input
+                          type="email"
+                          value={vendorInfo.email}
+                          disabled
+                          className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-black font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Service Name</label>
+                        <input
+                          type="text"
+                          value={vendorInfo.service_name || ''}
+                          disabled={!isEditing}
+                          onChange={handleServiceNameChange}
+                          placeholder="Enter your business name"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Contact Number</label>
+                        <input
+                          type="text"
+                          value={vendorInfo.contact_number || ''}
+                          disabled={!isEditing}
+                          onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, contact_number: e.target.value })}
+                          placeholder="Enter contact number"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Expertise</label>
+                        <input
+                          type="text"
+                          value={vendorInfo.expertise_in || ''}
+                          disabled={!isEditing}
+                          onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, expertise_in: e.target.value })}
+                          placeholder="e.g., Business Strategy, Marketing"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Years of Excellence</label>
+                        <input
+                          type="number"
+                          value={vendorInfo.years_of_excellence || 0}
+                          disabled={!isEditing}
+                          onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, years_of_excellence: parseInt(e.target.value) || 0 })}
+                          placeholder="Years of experience"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Address</label>
+                        <textarea
+                          value={vendorInfo.address || ''}
+                          disabled={!isEditing}
+                          onChange={(e) => isEditing && setVendorInfo({ ...vendorInfo, address: e.target.value })}
+                          placeholder="Enter business address"
+                          rows={3}
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Years in Business</label>
-                      <input
-                        type="number"
-                        value={editableProfile?.years_in_business || 0}
-                        onChange={(e) => setEditableProfile(prev => prev ? { ...prev, years_in_business: parseInt(e.target.value) || 0 } : null)}
-                        disabled={!isEditing}
-                        placeholder="0"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
-                    </div>
+                    {/* Business Details */}
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-bold text-black border-b border-gray-200 pb-2">Business Details</h3>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Business Registration Number</label>
-                      <input
-                        type="text"
-                        value={editableProfile?.business_registration_number || ''}
-                        onChange={(e) => setEditableProfile(prev => prev ? { ...prev, business_registration_number: e.target.value } : null)}
-                        disabled={!isEditing}
-                        placeholder="Enter registration number"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
-                    </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Website URL</label>
+                        <input
+                          type="url"
+                          value={editableProfile?.website_url || ''}
+                          onChange={(e) => setEditableProfile(prev => prev ? { ...prev, website_url: e.target.value } : null)}
+                          disabled={!isEditing}
+                          placeholder="https://yourwebsite.com"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Tax Identification Number</label>
-                      <input
-                        type="text"
-                        value={editableProfile?.tax_identification_number || ''}
-                        onChange={(e) => setEditableProfile(prev => prev ? { ...prev, tax_identification_number: e.target.value } : null)}
-                        disabled={!isEditing}
-                        placeholder="Enter tax ID"
-                        className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
-                      />
-                    </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Years in Business</label>
+                        <input
+                          type="number"
+                          value={editableProfile?.years_in_business || 0}
+                          onChange={(e) => setEditableProfile(prev => prev ? { ...prev, years_in_business: parseInt(e.target.value) || 0 } : null)}
+                          disabled={!isEditing}
+                          placeholder="0"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
 
-                    {/* Verification Status */}
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Verification Status</label>
-                      <div className="flex items-center gap-3">
-                        {getVerificationStatusDisplay()}
-                        {vendorProfile.verification_notes && (
-                          <span className="text-sm text-gray-600 font-medium">• {vendorProfile.verification_notes}</span>
-                        )}
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Business Registration Number</label>
+                        <input
+                          type="text"
+                          value={editableProfile?.business_registration_number || ''}
+                          onChange={(e) => setEditableProfile(prev => prev ? { ...prev, business_registration_number: e.target.value } : null)}
+                          disabled={!isEditing}
+                          placeholder="Enter registration number"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Tax Identification Number</label>
+                        <input
+                          type="text"
+                          value={editableProfile?.tax_identification_number || ''}
+                          onChange={(e) => setEditableProfile(prev => prev ? { ...prev, tax_identification_number: e.target.value } : null)}
+                          disabled={!isEditing}
+                          placeholder="Enter tax ID"
+                          className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium ${isEditing ? 'focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent bg-white' : 'bg-gray-50'}`}
+                        />
+                      </div>
+
+                      {/* Verification Status */}
+                      <div>
+                        <label className="block text-sm font-semibold text-black mb-2">Verification Status</label>
+                        <div className="flex items-center gap-3">
+                          {getVerificationStatusDisplay()}
+                          {vendorProfile.verification_notes && (
+                            <span className="text-sm text-gray-600 font-medium">• {vendorProfile.verification_notes}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Enhanced Availability Tab */}
-          {activeTab === 'availability' && (
-            <div key="availability-section">
-              <AvailabilityManager vendorId={auth.vendorId || auth.email} />
-            </div>
-          )}
+            {/* Enhanced Availability Tab */}
+            {activeTab === 'availability' && (
+              <div key="availability-section">
+                <AvailabilityManager vendorId={auth.vendorId || auth.email} />
+              </div>
+            )}
 
-          {/* Enhanced Sessions Tab */}
-          {activeTab === 'sessions' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-3xl font-bold text-black">Client Sessions</h2>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => setSessionStatusFilter('all')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'all'
-                        ? 'bg-gradient-to-b from-[#1E3A8A] to-[#10B981] text-white'
-                        : 'bg-gray-100 text-black hover:bg-gray-200'
-                        }`}
-                    >
-                      All
-                    </button>
-                    <button
-                      onClick={() => setSessionStatusFilter('pending')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'pending'
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-gray-100 text-black hover:bg-gray-200'
-                        }`}
-                    >
-                      Pending
-                    </button>
-                    <button
-                      onClick={() => setSessionStatusFilter('confirmed')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'confirmed'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-black hover:bg-gray-200'
-                        }`}
-                    >
-                      Confirmed
-                    </button>
-                    <button
-                      onClick={() => setSessionStatusFilter('completed')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'completed'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 text-black hover:bg-gray-200'
-                        }`}
-                    >
-                      Completed
-                    </button>
-                    <button
-                      onClick={() => setSessionStatusFilter('cancelled')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'cancelled'
-                        ? 'bg-red-500 text-white'
-                        : 'bg-gray-100 text-black hover:bg-gray-200'
-                        }`}
-                    >
-                      Cancelled
-                    </button>
-                  </div>
-                </div>
-
-                {sessionsLoading ? (
-                  <div className="flex justify-center items-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#1E3A8A]"></div>
-                  </div>
-                ) : sessions.length === 0 ? (
-                  <div className="text-center py-16">
-                    <div className="w-24 h-24 bg-gradient-to-br from-purple-50 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <ClockIcon className="w-12 h-12 text-purple-600" />
+            {/* Enhanced Sessions Tab */}
+            {activeTab === 'sessions' && (
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-3xl font-bold text-black">Client Sessions</h2>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setSessionStatusFilter('all')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'all'
+                          ? 'bg-gradient-to-b from-[#1E3A8A] to-[#10B981] text-white'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                          }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setSessionStatusFilter('pending')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'pending'
+                          ? 'bg-yellow-500 text-white'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                          }`}
+                      >
+                        Pending
+                      </button>
+                      <button
+                        onClick={() => setSessionStatusFilter('confirmed')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'confirmed'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                          }`}
+                      >
+                        Confirmed
+                      </button>
+                      <button
+                        onClick={() => setSessionStatusFilter('completed')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'completed'
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                          }`}
+                      >
+                        Completed
+                      </button>
+                      <button
+                        onClick={() => setSessionStatusFilter('cancelled')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${sessionStatusFilter === 'cancelled'
+                          ? 'bg-red-500 text-white'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                          }`}
+                      >
+                        Cancelled
+                      </button>
                     </div>
-                    <h3 className="text-2xl font-bold text-black mb-3">No Sessions Yet</h3>
-                    <p className="text-gray-600 text-lg">
-                      When clients book sessions with you, they will appear here.
+                  </div>
+
+                  {loading ? (
+                    <div className="flex justify-center items-center py-20">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#1E3A8A]"></div>
+                    </div>
+                  ) : error ? (
+                    <div className="text-center py-16">
+                      <div className="w-24 h-24 bg-gradient-to-br from-purple-50 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <ClockIcon className="w-12 h-12 text-purple-600" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-black mb-3">Failed to Load Sessions</h3>
+                      <p className="text-gray-600 text-lg">
+                        {error}
+                      </p>
+                    </div>
+                  ) : sessions.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="w-24 h-24 bg-gradient-to-br from-purple-50 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <ClockIcon className="w-12 h-12 text-purple-600" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-black mb-3">No Sessions Yet</h3>
+                      <p className="text-gray-600 text-lg">
+                        When clients book sessions with you, they will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Client
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Date
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Service
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {sessions
+                            .filter(session => sessionStatusFilter === 'all' || session.status === sessionStatusFilter)
+                            .map((session) => (
+                              <tr key={session.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#10B981] flex items-center justify-center text-white font-medium">
+                                      {session.userName ? session.userName.charAt(0).toUpperCase() : '?'}
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">{session.userName}</div>
+                                      <div className="text-sm text-gray-500">{session.userEmail}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{formatDate(session.request_date)}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-900">{session.serviceName}</div>
+                                  <div className="text-sm text-gray-500 truncate max-w-xs">
+                                    {session.message ? (
+                                      <span title={session.message}>
+                                        {session.message.length > 50
+                                          ? `${session.message.substring(0, 50)}...`
+                                          : session.message}
+                                      </span>
+                                    ) : (
+                                      <span className="italic text-gray-400">No message</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    ${session.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                      session.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                                        session.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                          'bg-red-100 text-red-800'}`}>
+                                    {session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Pending'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  {session.status === 'pending' && (
+                                    <div className="flex justify-end space-x-2">
+                                      <button
+                                        onClick={() => updateSessionStatus(session.id, 'confirmed')}
+                                        className="text-xs bg-gradient-to-b from-[#1E3A8A] to-[#10B981] text-white px-3 py-1 rounded-lg hover:opacity-90 transition-colors"
+                                      >
+                                        Accept
+                                      </button>
+                                      <button
+                                        onClick={() => updateSessionStatus(session.id, 'cancelled')}
+                                        className="text-xs bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition-colors"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  )}
+                                  {session.status === 'confirmed' && (
+                                    <button
+                                      onClick={() => updateSessionStatus(session.id, 'completed')}
+                                      className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors"
+                                    >
+                                      Mark Completed
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Enhanced Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-8">
+                <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+                  <h2 className="text-3xl font-bold text-black mb-8">Analytics Overview</h2>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                      <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
+                        <DollarSignIcon className="w-7 h-7 text-blue-600" />
+                      </div>
+                      <h3 className="text-sm font-semibold text-black">Total Revenue</h3>
+                      <p className="text-3xl font-bold text-black">$0</p>
+                      <p className="text-xs text-gray-600 mt-1 font-medium">0 reviews</p>
+                    </div>
+
+                    <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
+                      <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
+                        <UserIcon className="w-7 h-7 text-orange-600" />
+                      </div>
+                      <h3 className="text-sm font-semibold text-black">Clients</h3>
+                      <p className="text-3xl font-bold text-black">0</p>
+                      <p className="text-xs text-gray-600 mt-1 font-medium">Total</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center py-12 border-t border-gray-100">
+                    <p className="text-gray-600 text-lg font-medium">
+                      Analytics will be available once you start receiving bookings.
                     </p>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Client
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Service
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {sessions
-                          .filter(session => sessionStatusFilter === 'all' || session.status === sessionStatusFilter)
-                          .map((session) => (
-                            <tr key={session.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#10B981] flex items-center justify-center text-white font-medium">
-                                    {session.userName ? session.userName.charAt(0).toUpperCase() : '?'}
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">{session.userName}</div>
-                                    <div className="text-sm text-gray-500">{session.userEmail}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{formatDate(session.request_date)}</div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-900">{session.serviceName}</div>
-                                <div className="text-sm text-gray-500 truncate max-w-xs">
-                                  {session.message ? (
-                                    <span title={session.message}>
-                                      {session.message.length > 50
-                                        ? `${session.message.substring(0, 50)}...`
-                                        : session.message}
-                                    </span>
-                                  ) : (
-                                    <span className="italic text-gray-400">No message</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                  ${session.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                    session.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                                      session.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                        'bg-red-100 text-red-800'}`}>
-                                  {session.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : 'Pending'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                {session.status === 'pending' && (
-                                  <div className="flex justify-end space-x-2">
-                                    <button
-                                      onClick={() => updateSessionStatus(session.id, 'confirmed')}
-                                      className="text-xs bg-gradient-to-b from-[#1E3A8A] to-[#10B981] text-white px-3 py-1 rounded-lg hover:opacity-90 transition-colors"
-                                    >
-                                      Accept
-                                    </button>
-                                    <button
-                                      onClick={() => updateSessionStatus(session.id, 'cancelled')}
-                                      className="text-xs bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition-colors"
-                                    >
-                                      Reject
-                                    </button>
-                                  </div>
-                                )}
-                                {session.status === 'confirmed' && (
-                                  <button
-                                    onClick={() => updateSessionStatus(session.id, 'completed')}
-                                    className="text-xs bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors"
-                                  >
-                                    Mark Completed
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Enhanced Analytics Tab */}
-          {activeTab === 'analytics' && (
-            <div className="space-y-8">
-              <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-                <h2 className="text-3xl font-bold text-black mb-8">Analytics Overview</h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                  <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-                    <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
-                      <DollarSignIcon className="w-7 h-7 text-blue-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-black">Total Revenue</h3>
-                    <p className="text-3xl font-bold text-black">$0</p>
-                    <p className="text-xs text-gray-600 mt-1 font-medium">0 reviews</p>
-                  </div>
-
-                  <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
-                    <div className="w-14 h-14 bg-white rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg">
-                      <UserIcon className="w-7 h-7 text-orange-600" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-black">Clients</h3>
-                    <p className="text-3xl font-bold text-black">0</p>
-                    <p className="text-xs text-gray-600 mt-1 font-medium">Total</p>
-                  </div>
                 </div>
+              </div>
+            )}
 
-                <div className="text-center py-12 border-t border-gray-100">
-                  <p className="text-gray-600 text-lg font-medium">
-                    Analytics will be available once you start receiving bookings.
+            {/* Enhanced Reviews Tab */}
+            {activeTab === 'reviews' && (
+              <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+                <h2 className="text-3xl font-bold text-black mb-6">Client Reviews</h2>
+                <div className="text-center py-16">
+                  <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <MessageCircleIcon className="w-12 h-12 text-emerald-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-black mb-3">No Reviews Yet</h3>
+                  <p className="text-gray-600 text-lg">
+                    Reviews from your clients will appear here once you complete your first sessions.
                   </p>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Enhanced Reviews Tab */}
-          {activeTab === 'reviews' && (
-            <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
-              <h2 className="text-3xl font-bold text-black mb-6">Client Reviews</h2>
-              <div className="text-center py-16">
-                <div className="w-24 h-24 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <MessageCircleIcon className="w-12 h-12 text-emerald-600" />
-                </div>
-                <h3 className="text-2xl font-bold text-black mb-3">No Reviews Yet</h3>
-                <p className="text-gray-600 text-lg">
-                  Reviews from your clients will appear here once you complete your first sessions.
-                </p>
-              </div>
-            </div>
-          )}
-        </main>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

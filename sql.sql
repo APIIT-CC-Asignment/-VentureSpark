@@ -26,9 +26,19 @@ CREATE TABLE booking (
     request_date DATE NOT NULL,
     what_you_need TEXT,
     createdate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    committed BOOLEAN DEFAULT FALSE
+    committed BOOLEAN DEFAULT FALSE,
     Requstedservice TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    calendar_event_id VARCHAR(255),
+    meet_link TEXT,
+    vendor_id INT,
+    FOREIGN KEY (vendor_id) REFERENCES Vendor(id)
 );
+
+-- Add these columns to the booking table for Google Calendar integration
+ALTER TABLE booking
+ADD COLUMN calendar_event_id VARCHAR(255),
+ADD COLUMN meet_link TEXT;
 
 
 

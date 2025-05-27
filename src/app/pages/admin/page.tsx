@@ -120,7 +120,7 @@ export default function AdminDashboard() {
   >("dashboard");
   const [users, setUsers] = useState<User[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const email = localStorage.getItem("email") || "";
+  const [email, setEmail] = useState("");
   const [services, setServices] = useState<Service[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -136,14 +136,13 @@ export default function AdminDashboard() {
     "" | "pending" | "confirmed" | "completed" | "cancelled"
   >("");
 
-
   const filteredServices = services.filter(
-    (service) =>
+    (service: Service) =>
       serviceStatusFilter === "all" || service.status === serviceStatusFilter
   );
 
   const filteredBookings = bookings.filter(
-    (booking) =>
+    (booking: Booking) =>
       bookingStatusFilter === "" || booking.status === bookingStatusFilter
   );
 
@@ -157,9 +156,13 @@ export default function AdminDashboard() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   useEffect(() => {
-    const group = localStorage.getItem("typegroup");
-
-    setUsergroup(group);
+    // Safely access localStorage only on client side
+    if (typeof window !== 'undefined') {
+      const storedEmail = localStorage.getItem("email") || "";
+      const storedGroup = localStorage.getItem("typegroup");
+      setEmail(storedEmail);
+      setUsergroup(storedGroup);
+    }
   }, []);
 
   const fetchData = async (url: string) => {
@@ -363,9 +366,21 @@ export default function AdminDashboard() {
 
       <div className="flex-1 overflow-y-auto p-8">
         <header className="bg-white shadow-sm py-4 px-6 flex items-center justify-between">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-500 focus:outline-none">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-blue-600 hover:text-blue-900 font-medium text-sm"
+            aria-label="Toggle Sidebar"
+          >
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16"></path>
             </svg>
           </button>
 
@@ -1128,7 +1143,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {bookings
+                    {filteredBookings
                       .filter((booking) => (!bookingStatusFilter ? true : booking.status === bookingStatusFilter))
                       .map((booking) => (
                         <tr key={booking.id} className="hover:bg-gray-50">
@@ -1179,7 +1194,7 @@ export default function AdminDashboard() {
                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-gray-700">
-                      Showing <span className="font-medium">1</span> to <span className="font-medium">{bookings.length}</span> of{' '}
+                      Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredBookings.length}</span> of{' '}
                       <span className="font-medium">{bookings.length}</span> results
                     </p>
                   </div>
