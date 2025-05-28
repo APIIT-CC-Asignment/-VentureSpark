@@ -96,29 +96,6 @@ export class GoogleCalendarService {
             };
 
             console.log('Calendar event being created:', calendarEvent); // Debug log
-            // Validate dates before processing
-            console.log('Event times DEBUG:', {
-                originalStartTime: event.startTime,
-                originalEndTime: event.endTime,
-                startTimeValid: event.startTime instanceof Date && !isNaN(event.startTime.getTime()),
-                endTimeValid: event.endTime instanceof Date && !isNaN(event.endTime.getTime()),
-                startTimeString: event.startTime?.toString(),
-                endTimeString: event.endTime?.toString(),
-                serverTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-            });
-
-            // Check if dates are valid before proceeding
-            if (!event.startTime || !event.endTime) {
-                throw new Error('Start time and end time are required');
-            }
-
-            if (!(event.startTime instanceof Date) || isNaN(event.startTime.getTime())) {
-                throw new Error(`Invalid start time: ${event.startTime}`);
-            }
-
-            if (!(event.endTime instanceof Date) || isNaN(event.endTime.getTime())) {
-                throw new Error(`Invalid end time: ${event.endTime}`);
-            }
 
             const response = await this.calendar.events.insert({
                 calendarId: 'primary',

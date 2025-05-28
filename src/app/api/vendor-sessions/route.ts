@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '../../lib/db';
 import { RowDataPacket } from 'mysql2';
 import { GoogleCalendarService } from '../../lib/google-calendar';
-import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+
 
 // GET method - Fetch vendor's booked sessions
 export async function GET(req: NextRequest) {
@@ -219,7 +218,7 @@ export async function POST(req: NextRequest) {
                     );
                 }
 
-                const responsePayload: any = {
+                const responsePayload: Record<string, unknown> = {
                     message: 'Booking confirmed and calendar event created',
                     calendarEvent: calendarResult
                 };
