@@ -58,6 +58,7 @@ interface AvailabilitySlot {
   end_time: string;
   created_at: string;
   updated_at: string;
+  is_booked?: boolean;
 }
 
 interface GroupedAvailability {
@@ -260,6 +261,7 @@ const VendorDashboard: React.FC = () => {
                   // Ensure date fields are properly parsed
                   start_time: new Date(slot.start_time).toISOString(),
                   end_time: new Date(slot.end_time).toISOString(),
+                  is_booked: slot.is_booked || false
                 };
               } catch (error) {
                 // Return the original slot if there's an error
@@ -732,16 +734,22 @@ const VendorDashboard: React.FC = () => {
                                       key={slot.id}
                                       className="inline-flex items-center group"
                                     >
-                                      <span className="bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white text-xs font-medium px-3 py-1 rounded-full">
+                                      <span className={`text-xs font-medium px-3 py-1 rounded-full ${slot.is_booked
+                                          ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
+                                          : 'bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white'
+                                        }`}>
                                         {formatTimeOnly(slot.start_time)} - {formatTimeOnly(slot.end_time)}
+                                        {slot.is_booked && ' (Booked)'}
                                       </span>
-                                      <button
-                                        onClick={() => deleteAvailability(slot.id)}
-                                        className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"
-                                        title="Delete this slot"
-                                      >
-                                        <XIcon className="w-3 h-3" />
-                                      </button>
+                                      {!slot.is_booked && (
+                                        <button
+                                          onClick={() => deleteAvailability(slot.id)}
+                                          className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"
+                                          title="Delete this slot"
+                                        >
+                                          <XIcon className="w-3 h-3" />
+                                        </button>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -749,13 +757,16 @@ const VendorDashboard: React.FC = () => {
                               <td className="px-4 py-4 whitespace-nowrap text-right border-b border-gray-100">
                                 <button
                                   onClick={() => {
-                                    // Delete all slots for this date
-                                    clearDaySlots(dayData.slots);
+                                    // Only delete unbooked slots for this date
+                                    const unbookedSlots = dayData.slots.filter(slot => !slot.is_booked);
+                                    if (unbookedSlots.length > 0) {
+                                      clearDaySlots(unbookedSlots);
+                                    }
                                   }}
                                   className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors text-xs font-medium"
-                                  title="Delete all slots for this date"
+                                  title="Delete all unbooked slots for this date"
                                 >
-                                  Clear Day
+                                  Clear Unbooked
                                 </button>
                               </td>
                             </tr>
@@ -1272,6 +1283,17 @@ const VendorDashboard: React.FC = () => {
         const hasGoogleAccess = localStorage.getItem('google_access_token');
 
         if (!hasGoogleAccess) {
+          // Show confirmation dialog
+          const confirmed = window.confirm(
+            'To schedule this session, we need to connect to your Google Calendar. ' +
+            'This will allow us to create calendar events and Google Meet links for your sessions. ' +
+            'You will be redirected to Google to authorize this access. Would you like to continue?'
+          );
+
+          if (!confirmed) {
+            return;
+          }
+
           // Ensure client ID is available
           if (!config.google.clientId) {
             console.error('Google Client ID is not configured');
@@ -1301,6 +1323,9 @@ const VendorDashboard: React.FC = () => {
         }
       }
 
+      const accessToken = localStorage.getItem('google_access_token');
+      const refreshToken = localStorage.getItem('google_refresh_token');
+
       const response = await fetch('/api/vendor-sessions', {
         method: 'POST',
         headers: {
@@ -1310,7 +1335,8 @@ const VendorDashboard: React.FC = () => {
           sessionId,
           vendorId: auth.email,
           status,
-          accessToken: localStorage.getItem('google_access_token')
+          accessToken,
+          refreshToken
         }),
       });
 
@@ -1319,6 +1345,11 @@ const VendorDashboard: React.FC = () => {
       }
 
       const data = await response.json();
+
+      // If a new access token is returned, update localStorage
+      if (data.newAccessToken) {
+        localStorage.setItem('google_access_token', data.newAccessToken);
+      }
 
       // If calendar event was created, show success message with Meet link
       if (data.calendarEvent) {
@@ -1352,6 +1383,45 @@ const VendorDashboard: React.FC = () => {
     } catch (e) {
       return 'Invalid date';
     }
+  };
+
+  const handleConfirmSession = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/vendor-sessions/${sessionId}/confirm`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        if (error.message?.includes('Google Calendar connection has expired')) {
+          // Clear stored tokens
+          localStorage.removeItem('google_access_token');
+          localStorage.removeItem('google_refresh_token');
+          toast.error('Your Google Calendar connection has expired. Please reconnect your calendar.');
+          return;
+        }
+        throw new Error(error.message || 'Failed to confirm session');
+      }
+
+      const data = await response.json();
+      toast.success('Session confirmed successfully');
+      // Refresh sessions list
+      fetchSessions();
+    } catch (error) {
+      console.error('Error confirming session:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to confirm session');
+    }
+  };
+
+  // Add a helper to format time
+  const formatTimeRange = (start: string, end: string) => {
+    if (!start) return '';
+    const startDate = new Date(start);
+    const endDate = end ? new Date(end) : null;
+    if (isNaN(startDate.getTime())) return '';
+    const startStr = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const endStr = endDate && !isNaN(endDate.getTime()) ? endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+    return endStr ? `${startStr} - ${endStr}` : startStr;
   };
 
   // Check if we should render the page at all
@@ -1924,6 +1994,9 @@ const VendorDashboard: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-gray-900">{formatDate(session.request_date)}</div>
+                                  {session.start_time && (
+                                    <div className="text-xs text-gray-600">{formatTimeRange(session.start_time, session.end_time)}</div>
+                                  )}
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="text-sm text-gray-900">{session.serviceName}</div>

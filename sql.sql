@@ -74,3 +74,7 @@ CREATE TABLE `vendor_profiles` (
   UNIQUE KEY `vendor_id` (`vendor_id`),
   CONSTRAINT `fk_vendor_profiles_vendor_id` FOREIGN KEY (`vendor_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Add is_booked column to vendor_availability table
+ALTER TABLE vendor_availability
+ADD COLUMN is_booked BOOLEAN DEFAULT FALSE;

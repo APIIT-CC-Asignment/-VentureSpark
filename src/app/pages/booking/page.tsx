@@ -103,6 +103,7 @@ export default function BookingPage() {
     name: "",
     email: "",
     date: "",
+    preferred_time: "",
     message: "",
     servicename: selectedResource?.name || "",
     slotId: ""
@@ -127,7 +128,7 @@ export default function BookingPage() {
       const data = await response.json();
       console.log(`[booking] Found ${data.length} availability slots`);
 
-      // Filter out slots that have already passed and ensure proper date formatting
+      // Filter out slots that have already passed and are not booked
       const now = new Date();
       const validSlots = data.filter((slot: AvailabilitySlot) => {
         try {
@@ -285,11 +286,44 @@ export default function BookingPage() {
     setFormData(prev => ({ ...prev, date: "" }));
   };
 
+  const getSriLankaDate = () => {
+    const now = new Date();
+    // Convert to Sri Lanka timezone (UTC+5:30)
+    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Colombo' }));
+  };
+
+  const formatDateForInput = (date: Date) => {
+    return date.toLocaleString('en-US', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).split(',')[0].replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2');
+  };
+
+  useEffect(() => {
+    const today = getSriLankaDate();
+    setMinDate(formatDateForInput(today));
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("Submitting...");
 
     try {
+      // If using preferred date/time (no slot selected)
+      if (!selectedSlot && formData.date && formData.preferred_time) {
+        // Convert the date and time to ISO string in Sri Lanka timezone
+        const [year, month, day] = formData.date.split('-').map(Number);
+        const [hours, minutes] = formData.preferred_time.split(':').map(Number);
+
+        const bookingDateTime = new Date(year, month - 1, day, hours, minutes);
+        const sriLankaDateTime = new Date(bookingDateTime.toLocaleString('en-US', { timeZone: 'Asia/Colombo' }));
+
+        // Update formData with the timezone-adjusted date
+        formData.date = sriLankaDateTime.toISOString().split('T')[0];
+      }
+
       const response = await fetch("/api/postbooking", {
         method: "POST",
         headers: {
@@ -301,9 +335,19 @@ export default function BookingPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setStatus("Booked successful!");
-        alert("Booked successful!");
-        setFormData({ name: "", email: "", date: "", message: "", servicename: "", slotId: "" });
+        setStatus("Booked successfully!");
+        alert(
+          "Booking request submitted successfully! Please check your profile page for confirmation and further details."
+        );
+        setFormData({
+          name: "",
+          email: "",
+          date: "",
+          preferred_time: "",
+          message: "",
+          servicename: "",
+          slotId: ""
+        });
         setSelectedSlot(null);
       } else {
         if (response.status === 409) {
@@ -359,7 +403,8 @@ export default function BookingPage() {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'Asia/Colombo'
       });
     } catch (error) {
       console.error('[booking] Error formatting date:', error);
@@ -377,7 +422,8 @@ export default function BookingPage() {
       return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'Asia/Colombo'
       });
     } catch (error) {
       console.error('[booking] Error formatting time:', error);
@@ -725,24 +771,92 @@ export default function BookingPage() {
                   />
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="date"
-                    className="block text-sm font-medium text-gray-700 mb-2"
-                  >
-                    Preferred Date
-                  </label>
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleChange}
-                    min={minDate}
-                    className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
-                    required
-                  />
-                </div>
+                {/* Time Slot Selection */}
+                {loadingSlots ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-[#1E3A8A] border-t-transparent mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading available time slots...</p>
+                  </div>
+                ) : slotsError ? (
+                  <div className="text-red-500 text-center py-4">{slotsError}</div>
+                ) : availabilitySlots.length > 0 ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Available Time Slots
+                    </label>
+                    <div className="space-y-4">
+                      {Object.entries(groupedSlots()).map(([date, slots]) => (
+                        <div key={date} className="border border-gray-200 rounded-lg p-4">
+                          <h3 className="font-semibold text-[#1E3A8A] mb-3">{date}</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {slots.map((slot) => (
+                              <button
+                                key={slot.id}
+                                type="button"
+                                onClick={() => handleSlotSelect(slot.id)}
+                                className={`p-2 rounded-lg text-sm font-medium transition-all ${selectedSlot === slot.id
+                                  ? 'bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white'
+                                  : 'bg-gray-100 text-black hover:bg-gray-200'
+                                  }`}
+                              >
+                                {formatSlotTime(slot.start_time)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label
+                        htmlFor="date"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Preferred Date
+                      </label>
+                      <input
+                        type="date"
+                        id="date"
+                        name="date"
+                        value={formData.date}
+                        onChange={handleChange}
+                        min={minDate}
+                        className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
+                        required
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        All times are in Sri Lanka timezone (UTC+5:30)
+                      </p>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="preferred_time"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Preferred Time
+                      </label>
+                      <input
+                        type="time"
+                        id="preferred_time"
+                        name="preferred_time"
+                        value={formData.preferred_time}
+                        onChange={handleChange}
+                        min="08:00"
+                        max="20:00"
+                        className="w-full px-5 py-3 rounded-lg border border-[#1E3A8A]/20 bg-white text-black focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
+                        required
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Business hours: 8:00 AM - 8:00 PM (Sri Lanka time)
+                      </p>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      No available time slots found. Please select your preferred date and time, and the vendor will confirm your booking after reviewing your request.
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label
