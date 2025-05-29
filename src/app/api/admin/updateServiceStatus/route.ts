@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Missing serviceId or status' }, { status: 400 });
     }
 
-    const [result] = await pool.query(
-      'UPDATE Vendor SET status = ? WHERE id = ?',
+    await pool.query(
+      'UPDATE vendor SET status = $1 WHERE id = $2',
       [status, serviceId]
     );
 

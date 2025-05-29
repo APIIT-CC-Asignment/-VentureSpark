@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '../../lib/db';
-import { RowDataPacket } from 'mysql2';
 import { GoogleCalendarService } from '../../lib/google-calendar';
-
 
 // GET method - Fetch vendor's booked sessions
 export async function GET(req: NextRequest) {
@@ -21,31 +19,31 @@ export async function GET(req: NextRequest) {
 
         if (vendorId.includes('@')) {
             console.log('Looking up vendor ID for email:', vendorId);
-            const [userRows] = await pool.execute<RowDataPacket[]>(
-                'SELECT id FROM users WHERE email = ? AND typegroup = ?',
+            const userResult = await pool.query(
+                'SELECT id FROM users WHERE email = $1 AND typegroup = $2',
                 [vendorId, 'vendor']
             );
 
-            console.log('User rows found:', userRows);
+            console.log('User rows found:', userResult.rows);
 
-            if (!userRows || userRows.length === 0) {
+            if (!userResult.rows || userResult.rows.length === 0) {
                 console.log('No vendor found for email:', vendorId);
                 return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
             }
 
-            actualVendorId = userRows[0].id;
+            actualVendorId = userResult.rows[0].id;
             console.log('Resolved vendor ID:', actualVendorId);
         }
 
         // Query for all bookings related to this vendor, including slot times
-        const [rows] = await pool.execute<RowDataPacket[]>(`
+        const result = await pool.query(`
             SELECT 
                 b.id,
                 b.name AS userName,
                 b.email AS userEmail,
                 b.request_date,
                 b.what_you_need AS message,
-                b.Requstedservice AS serviceName,
+                b.requstedservice AS serviceName,
                 b.committed,
                 b.status,
                 v.service_name AS vendorServiceName,
@@ -53,15 +51,15 @@ export async function GET(req: NextRequest) {
                 va.start_time,
                 va.end_time
             FROM booking b
-            JOIN Vendor v ON b.Requstedservice = v.service_name
-            LEFT JOIN vendor_availability va ON b.slot_id = va.id
-            WHERE v.id = ?
+            JOIN vendor v ON b.requstedservice = v.service_name
+            LEFT JOIN vendor_availability va ON b.slot_id = va.id::text
+            WHERE v.id = $1
             ORDER BY b.request_date DESC
         `, [actualVendorId]);
 
-        console.log('Found bookings:', rows);
+        console.log('Found bookings:', result.rows);
 
-        return NextResponse.json(rows || []);
+        return NextResponse.json(result.rows || []);
     } catch (error) {
         console.error('Error fetching vendor sessions:', error);
         return NextResponse.json({
@@ -70,7 +68,6 @@ export async function GET(req: NextRequest) {
         }, { status: 500 });
     }
 }
-
 
 export async function POST(req: NextRequest) {
     try {
@@ -88,47 +85,46 @@ export async function POST(req: NextRequest) {
         let actualVendorId = vendorId;
 
         if (typeof vendorId === 'string' && vendorId.includes('@')) {
-            const [userRows] = await pool.execute<RowDataPacket[]>(
-                'SELECT id FROM users WHERE email = ? AND typegroup = ?',
+            const userResult = await pool.query(
+                'SELECT id FROM users WHERE email = $1 AND typegroup = $2',
                 [vendorId, 'vendor']
             );
 
-            if (!userRows || userRows.length === 0) {
+            if (!userResult.rows || userResult.rows.length === 0) {
                 return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
             }
 
-            actualVendorId = userRows[0].id;
+            actualVendorId = userResult.rows[0].id;
         }
 
         // Verify the booking belongs to this vendor
-        const [bookingCheck] = await pool.execute<RowDataPacket[]>(`
-    SELECT 
-        b.*,
-        b.name AS userName,
-        b.email AS userEmail,
-        b.what_you_need AS message,
-        b.Requstedservice AS serviceName,
-        v.email as vendor_email, 
-        v.service_name
-    FROM booking b
-    JOIN Vendor v ON b.Requstedservice = v.service_name
-    WHERE b.id = ? AND v.id = ?
-`, [sessionId, actualVendorId]);
+        const bookingResult = await pool.query(`
+            SELECT 
+                b.*,
+                b.name AS userName,
+                b.email AS userEmail,
+                b.what_you_need AS message,
+                b.requstedservice AS serviceName,
+                v.email as vendor_email, 
+                v.service_name
+            FROM booking b
+            JOIN vendor v ON b.requstedservice = v.service_name
+            WHERE b.id = $1 AND v.id = $2
+        `, [sessionId, actualVendorId]);
 
-        if (!bookingCheck || bookingCheck.length === 0) {
+        if (!bookingResult.rows || bookingResult.rows.length === 0) {
             return NextResponse.json({ error: 'Booking not found or does not belong to this vendor' }, { status: 404 });
         }
 
-        const booking = bookingCheck[0];
+        const booking = bookingResult.rows[0];
 
         // Update the booking status
-        await pool.execute(
-            'UPDATE booking SET status = ?, committed = ? WHERE id = ?',
+        await pool.query(
+            'UPDATE booking SET status = $1, committed = $2 WHERE id = $3',
             [status, status === 'confirmed' || status === 'completed', sessionId]
         );
 
         // If the booking is confirmed, create a Google Calendar event
-        // Replace the entire calendar creation section in your POST handler
         if (status === 'confirmed' && accessToken) {
             try {
                 // Debug the booking data first
@@ -212,8 +208,8 @@ export async function POST(req: NextRequest) {
 
                 // Update booking with calendar event details
                 if (calendarResult.eventId) {
-                    await pool.execute(
-                        'UPDATE booking SET calendar_event_id = ?, meet_link = ? WHERE id = ?',
+                    await pool.query(
+                        'UPDATE booking SET calendar_event_id = $1, meet_link = $2 WHERE id = $3',
                         [calendarResult.eventId, calendarResult.meetLink || null, sessionId]
                     );
                 }
@@ -238,18 +234,6 @@ export async function POST(req: NextRequest) {
                 });
             }
         }
-        const bookingTest = bookingCheck[0];
-
-        // ADD THESE DEBUG LOGS
-        console.log('=== BOOKING DEBUG ===');
-        console.log('Raw booking object:', booking);
-        console.log('Available keys:', Object.keys(booking));
-        console.log('userName:', bookingTest.userName);
-        console.log('userEmail:', bookingTest.userEmail);
-        console.log('serviceName:', bookingTest.serviceName);
-        console.log('vendor_email:', bookingTest.vendor_email);
-        console.log('request_date:', bookingTest.request_date);
-        console.log('=== END DEBUG ===');
 
         return NextResponse.json({ message: 'Booking status updated successfully' });
     } catch (error) {

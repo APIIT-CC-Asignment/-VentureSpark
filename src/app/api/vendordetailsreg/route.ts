@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { RowDataPacket } from "mysql2";
 import db from "../../lib/db";
 
-export async function POST(req: { json: () => Promise<{ service_name: string; years_of_excellence: number; email: string; contact_number: string; address: string; selected_services: string[]; type: string,expertise_in: string }> }) {
+export async function POST(req: { json: () => Promise<{ service_name: string; years_of_excellence: number; email: string; contact_number: string; address: string; selected_services: string[]; type: string, expertise_in: string }> }) {
   try {
     const {
       service_name,
@@ -22,11 +21,11 @@ export async function POST(req: { json: () => Promise<{ service_name: string; ye
       );
     }
 
-    const [rows]: [RowDataPacket[], any] = await db.query(
-      "SELECT email FROM Vendor WHERE email = ?",
+    const result = await db.query(
+      "SELECT email FROM vendor WHERE email = $1",
       [email]
     );
-    const existingVendor = rows;
+    const existingVendor = result.rows;
 
     if (existingVendor.length > 0) {
       return NextResponse.json(
@@ -38,7 +37,7 @@ export async function POST(req: { json: () => Promise<{ service_name: string; ye
     const selectedServicesString = JSON.stringify(selected_services);
 
     await db.query(
-      "INSERT INTO Vendor (service_name, years_of_excellence, email, contact_number, address, selected_services, type, expertise_in) VALUES (?, ?, ?, ?, ?, ?, ?,?)",
+      "INSERT INTO vendor (service_name, years_of_excellence, email, contact_number, address, selected_services, type, expertise_in) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
       [service_name, years_of_excellence, email, contact_number, address, selectedServicesString, type, expertise_in]
     );
 

@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       // Check if there's a record in the Vendor table
       try {
         const [vendorRows]: any = await pool.query(
-          "SELECT id FROM Vendor WHERE id = $1 OR email = $2",
+          "SELECT id FROM vendor WHERE id = $1 OR email = $2",
           [user.id, user.email]
         );
 

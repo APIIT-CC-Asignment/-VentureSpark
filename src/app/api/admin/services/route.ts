@@ -1,8 +1,5 @@
-
 import { NextResponse } from 'next/server';
-import { RowDataPacket } from 'mysql2';
 import pool from '../../../lib/db';
-
 
 type Service = {
   id: string;
@@ -22,20 +19,20 @@ type Service = {
 
 export async function GET() {
   try {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT id, service_name, years_of_excellence, email, contact_number, address, selected_services, type, active, created_at, updated_at, expertise_in,status FROM Vendor"
+    const result = await pool.query(
+      "SELECT id, service_name, years_of_excellence, email, contact_number, address, selected_services, type, active, created_at, updated_at, expertise_in, status FROM vendor"
     );
 
-    const services: Service[] = rows.map((row) => ({
-      id: row.id,
+    const services: Service[] = result.rows.map((row: any) => ({
+      id: row.id.toString(),
       service_name: row.service_name,
-      years_of_excellence: row.years_of_excellence,
+      years_of_excellence: row.years_of_excellence.toString(),
       email: row.email,
       contact_number: row.contact_number,
       address: row.address,
       selected_services: row.selected_services,
       type: row.type,
-      active: row.active === 1,
+      active: row.active, // PostgreSQL returns boolean directly
       created_at: row.created_at,
       updated_at: row.updated_at,
       expertise_in: row.expertise_in,

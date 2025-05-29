@@ -1,7 +1,6 @@
 // File: app/api/vendor/profile/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import pool from "../../lib/db";
-import { RowDataPacket, OkPacket } from 'mysql2';
 
 function calculateCompletionPercentage(data: any): number {
     // Fields to check for completion
@@ -29,8 +28,8 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
         }
 
-        // Now we're getting the profile data directly from the Vendor table
-        const [rows] = await pool.execute<RowDataPacket[]>(`
+        // Now we're getting the profile data directly from the vendor table
+        const result = await pool.query(`
             SELECT 
                 id as vendor_id,
                 website_url,
@@ -47,15 +46,15 @@ export async function GET(req: NextRequest) {
                 reviewed_at,
                 created_at,
                 updated_at
-            FROM Vendor
-            WHERE id = ?
+            FROM vendor
+            WHERE id = $1
         `, [vendorId]);
 
-        if (!rows || rows.length === 0) {
+        if (!result.rows || result.rows.length === 0) {
             return NextResponse.json({ error: 'Vendor profile not found' }, { status: 404 });
         }
 
-        return NextResponse.json(rows[0]);
+        return NextResponse.json(result.rows[0]);
     } catch (error) {
         console.error('Error fetching vendor profile:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -132,19 +131,19 @@ export async function PUT(req: NextRequest) {
         const completionPercentage = calculateCompletionPercentage(data);
 
         // Update the vendor record
-        const [result] = await pool.execute<OkPacket>(
-            `UPDATE Vendor SET
-                website_url = ?,
-                portfolio_documents = ?,
-                years_in_business = ?,
-                business_registration_number = ?,
-                tax_identification_number = ?,
-                social_media_links = ?,
-                certifications = ?,
-                profile_completion_percentage = ?,
+        const updateResult = await pool.query(
+            `UPDATE vendor SET
+                website_url = $1,
+                portfolio_documents = $2,
+                years_in_business = $3,
+                business_registration_number = $4,
+                tax_identification_number = $5,
+                social_media_links = $6,
+                certifications = $7,
+                profile_completion_percentage = $8,
                 verification_status = 'pending',
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?`,
+            WHERE id = $9`,
             [
                 data.website_url || null,
                 data.portfolio_documents || '[]',
@@ -158,12 +157,12 @@ export async function PUT(req: NextRequest) {
             ]
         );
 
-        if (result.affectedRows === 0) {
+        if (updateResult.rowCount === 0) {
             return NextResponse.json({ error: 'Vendor profile not found' }, { status: 404 });
         }
 
         // Return the updated profile
-        const [updatedProfile] = await pool.execute<RowDataPacket[]>(
+        const profileResult = await pool.query(
             `SELECT 
                 id as vendor_id,
                 website_url,
@@ -180,12 +179,12 @@ export async function PUT(req: NextRequest) {
                 reviewed_at,
                 created_at,
                 updated_at
-            FROM Vendor
-            WHERE id = ?`,
+            FROM vendor
+            WHERE id = $1`,
             [data.vendor_id]
         );
 
-        return NextResponse.json(updatedProfile[0]);
+        return NextResponse.json(profileResult.rows[0]);
     } catch (error) {
         console.error('Error updating vendor profile:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

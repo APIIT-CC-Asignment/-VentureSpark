@@ -1,8 +1,7 @@
 // src/app/api/admin/bookings/route.ts
 
 import { NextResponse } from 'next/server';
-import { RowDataPacket } from 'mysql2';
-import pool from '../../../lib/db'; 
+import pool from '../../../lib/db';
 
 type Booking = {
   id: string;
@@ -18,19 +17,19 @@ type Booking = {
 
 export async function GET() {
   try {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT id, name, email, request_date, what_you_need, createdate, committed, Requstedservice,status FROM Booking"
+    const result = await pool.query(
+      "SELECT id, name, email, request_date, what_you_need, createdate, committed, requstedservice, status FROM booking"
     );
 
-    const bookings: Booking[] = rows.map((row) => ({
-      id: row.id,
+    const bookings: Booking[] = result.rows.map((row: any) => ({
+      id: row.id.toString(),
       name: row.name,
       email: row.email,
       request_date: row.request_date,
       what_you_need: row.what_you_need,
       createdate: row.createdate,
-      committed: row.committed,
-      Requstedservice: row.Requstedservice,
+      committed: row.committed.toString(),
+      Requstedservice: row.requstedservice,
       status: row.status,
     }));
 
