@@ -1,23 +1,15 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import pool from '../../../lib/db'; // Adjust path as needed
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
     const { username, email } = await request.json();
-    
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    });
 
-    await connection.execute(
-      'UPDATE users SET username = ?, email = ? WHERE id = ?',
+    // Use PostgreSQL syntax with the shared pool
+    await pool.query(
+      'UPDATE users SET username = $1, email = $2 WHERE id = $3',
       [username, email, params.id]
     );
-
-    await connection.end();
 
     return NextResponse.json({ success: true });
   } catch (error) {

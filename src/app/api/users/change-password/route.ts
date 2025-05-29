@@ -1,25 +1,17 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import pool from '../../../lib/db'; // Adjust path as needed
 
 export async function POST(request: Request) {
   try {
     const { email, currentPassword, newPassword } = await request.json();
-    
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    });
 
     // Verify current password
-    const [users] = await connection.execute(
-      'SELECT id FROM users WHERE email = ? AND password = ?',
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND password = $2',
       [email, currentPassword]
     );
 
-    if (!Array.isArray(users) || users.length === 0) {
-      await connection.end();
+    if (userResult.rows.length === 0) {
       return NextResponse.json(
         { error: 'Current password is incorrect' },
         { status: 400 }
@@ -27,12 +19,10 @@ export async function POST(request: Request) {
     }
 
     // Update password
-    await connection.execute(
-      'UPDATE users SET password = ? WHERE email = ?',
+    await pool.query(
+      'UPDATE users SET password = $1 WHERE email = $2',
       [newPassword, email]
     );
-
-    await connection.end();
 
     return NextResponse.json({ success: true });
   } catch (error) {

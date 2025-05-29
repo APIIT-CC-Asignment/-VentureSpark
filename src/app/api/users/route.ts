@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import pool from '../../lib/db'; // Adjust path as needed
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -16,33 +16,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    });
+    console.log('Connected to PostgreSQL database');
 
-    console.log('Connected to database');
-
-    const [rows] = await connection.execute(
-      'SELECT id, username, email, typegroup, createdAt FROM users WHERE email = ?',
+    const result = await pool.query(
+      'SELECT id, username, email, typegroup, createdat FROM users WHERE email = $1',
       [email]
     );
 
-    await connection.end();
+    console.log('Query results:', result.rows);
 
-    console.log('Query results:', rows);
-
-    if (!Array.isArray(rows)) {
-      console.log('Unexpected query result format');
-      return NextResponse.json(
-        { error: 'Database error' },
-        { status: 500 }
-      );
-    }
-
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       console.log('No user found with this email');
       return NextResponse.json(
         { error: 'User not found' },
@@ -50,7 +33,7 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json(rows[0]);
+    return NextResponse.json(result.rows[0]);
   } catch (error) {
     console.error('Database error:', error);
     return NextResponse.json(

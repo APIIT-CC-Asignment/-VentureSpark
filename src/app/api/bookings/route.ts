@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import pool from '../../lib/db'; // Adjust path as needed
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -16,25 +16,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    });
+    console.log('Connecting to PostgreSQL database');
 
-    console.log('Connected to database');
-
-    const [rows] = await connection.execute(
-      'SELECT id, Requstedservice as service, request_date as date, status FROM booking WHERE email = ? ORDER BY request_date DESC',
+    const result = await pool.query(
+      'SELECT id, requstedservice as service, request_date as date, status FROM booking WHERE email = $1 ORDER BY request_date DESC',
       [email]
     );
 
-    await connection.end();
+    console.log('Query results:', result.rows);
 
-    console.log('Query results:', rows);
-
-    return NextResponse.json(rows);
+    return NextResponse.json(result.rows);
   } catch (error) {
     console.error('Database error:', error);
     return NextResponse.json(
