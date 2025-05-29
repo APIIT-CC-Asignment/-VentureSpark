@@ -44,14 +44,15 @@ export async function POST(req: Request) {
     if (user.typegroup === 'vendor') {
       // Check if there's a record in the Vendor table
       try {
-        const [vendorRows]: any = await pool.query(
+        // FIX: Remove array destructuring, use .rows property
+        const vendorResult = await pool.query(
           "SELECT id FROM vendor WHERE id = $1 OR email = $2",
           [user.id, user.email]
         );
 
         // If found, use that ID
-        if (vendorRows && vendorRows.length > 0) {
-          vendorId = vendorRows[0].id;
+        if (vendorResult.rows && vendorResult.rows.length > 0) {
+          vendorId = vendorResult.rows[0].id;
           console.log(`[loginpage] Found vendor record with ID: ${vendorId}`);
         } else {
           console.log(`[loginpage] No vendor record found, using user ID: ${vendorId}`);

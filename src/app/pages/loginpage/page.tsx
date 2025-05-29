@@ -53,20 +53,33 @@ export default function LoginPage() {
       if (response.ok) {
         setStatus("Login successful!");
 
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("email", formData.email);
-        localStorage.setItem("username", data.name || "");
-        localStorage.setItem("typegroup", data.typegroup);
+        // FIXED: Access user properties correctly from data.user
+        const user = data.user;
 
-        console.log("User type:", data.typegroup);
+        // Store all necessary data in localStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("email", user.email);
+        localStorage.setItem("username", user.username || "");
+        localStorage.setItem("typegroup", user.typegroup); // FIXED: was data.typegroup
+
+        // Store vendorId if it exists
+        if (user.vendorId) {
+          localStorage.setItem("vendorId", user.vendorId);
+        }
+
+        console.log("=== LOGIN DEBUG ===");
+        console.log("User data:", user);
+        console.log("User type:", user.typegroup);
+        console.log("Vendor ID:", user.vendorId);
+        console.log("==================");
 
         // Check if user is a vendor based on typegroup
-        if (data.typegroup === 'vendor') {
-          console.log("Setting vendor auth with ID:", data.vendorId);
+        if (user.typegroup === 'vendor') {
+          console.log("Setting vendor auth with ID:", user.vendorId);
           const authData = {
             isAuthenticated: true,
-            vendorId: data.vendorId || formData.email, // Use vendorId from response or email as fallback
-            email: formData.email
+            vendorId: user.vendorId || user.id, // Use vendorId from response or user.id as fallback
+            email: user.email
           };
           localStorage.setItem("vendorAuth", JSON.stringify(authData));
           console.log("Vendor auth data saved:", authData);
@@ -74,14 +87,16 @@ export default function LoginPage() {
           // Force redirect to vendor dashboard immediately
           console.log("Redirecting to vendor dashboard...");
           setTimeout(() => redirectTo("/pages/vendor-dashboard"), 100);
-        } else if (data.typegroup === 'client') {
+
+        } else if (user.typegroup === 'client') {
           // Redirect regular users to user profile page
           console.log("Redirecting to user profile...");
           redirectTo("/");
-        } else if (data.typegroup === 'Admin') {
 
+        } else if (user.typegroup === 'admin') {
           console.log("Redirecting to admin dashboard...");
           redirectTo("/pages/admin");
+
         } else {
           // Default redirect for unknown types
           console.log("Unknown user type, redirecting to home...");
