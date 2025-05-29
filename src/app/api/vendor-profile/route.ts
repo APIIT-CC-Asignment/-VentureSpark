@@ -75,29 +75,30 @@ export async function POST(req: NextRequest) {
         const completionPercentage = calculateCompletionPercentage(data);
 
         // Check if vendor exists
-        const [vendorCheck] = await pool.execute<RowDataPacket[]>(
-            'SELECT id FROM Vendor WHERE id = ?',
+        const vendorCheck = await pool.query(
+            'SELECT id FROM vendor WHERE id = $1',
             [data.vendor_id]
         );
 
-        if (!vendorCheck || vendorCheck.length === 0) {
+        if (!vendorCheck.rows || vendorCheck.rows.length === 0) {
             return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
         }
 
         // Update the existing vendor record with profile data
-        const [result] = await pool.execute<OkPacket>(
-            `UPDATE Vendor SET
-                website_url = ?,
-                portfolio_documents = ?,
-                years_in_business = ?,
-                business_registration_number = ?,
-                tax_identification_number = ?,
-                social_media_links = ?,
-                certifications = ?,
-                profile_completion_percentage = ?,
+        const result = await pool.query(
+            `UPDATE vendor SET
+                website_url = $1,
+                portfolio_documents = $2,
+                years_in_business = $3,
+                business_registration_number = $4,
+                tax_identification_number = $5,
+                social_media_links = $6,
+                certifications = $7,
+                profile_completion_percentage = $8,
                 verification_status = 'pending',
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?`,
+            WHERE id = $9
+            RETURNING *`,
             [
                 data.website_url || null,
                 data.portfolio_documents || '[]',
@@ -111,30 +112,7 @@ export async function POST(req: NextRequest) {
             ]
         );
 
-        // Return the updated profile
-        const [updatedProfile] = await pool.execute<RowDataPacket[]>(
-            `SELECT 
-                id as vendor_id,
-                website_url,
-                portfolio_documents,
-                years_in_business,
-                business_registration_number,
-                tax_identification_number,
-                social_media_links,
-                certifications,
-                profile_completion_percentage,
-                verification_status,
-                verification_notes,
-                reviewed_by,
-                reviewed_at,
-                created_at,
-                updated_at
-            FROM Vendor
-            WHERE id = ?`,
-            [data.vendor_id]
-        );
-
-        return NextResponse.json(updatedProfile[0], { status: 201 });
+        return NextResponse.json(result.rows[0], { status: 201 });
     } catch (error) {
         console.error('Error creating vendor profile:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

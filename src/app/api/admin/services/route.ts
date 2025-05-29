@@ -35,7 +35,7 @@ export async function GET() {
       address: row.address,
       selected_services: row.selected_services,
       type: row.type,
-      active: row.active === 1, 
+      active: row.active === 1,
       created_at: row.created_at,
       updated_at: row.updated_at,
       expertise_in: row.expertise_in,

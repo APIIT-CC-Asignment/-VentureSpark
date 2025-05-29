@@ -1,40 +1,39 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { RowDataPacket } from 'mysql2';
 import { NextResponse } from 'next/server';
 import pool from '../../lib/db';
 
 // Consultant type definition
-type ConsultantType = 'finance' | 'legal' | 'business' | '';
-type Consultant = {
+type ConsultantType = 'finance' | 'legal' | 'business';
+
+interface Consultant {
   id: string;
   name: string;
   type: ConsultantType;
   description: string;
-};
+}
 
 export async function POST(req: Request) {
   try {
     console.log("[getConsultants] Fetching consultants...");
 
     // Query for consultants (finance, legal, business)
-    const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT id, service_name, type, expertise_in FROM Vendor WHERE type IN ('finance', 'legal', 'business')"
+    const result = await pool.query(
+      "SELECT id, service_name, type, expertise_in FROM vendor WHERE type IN ('finance', 'legal', 'business')"
     );
 
-    console.log(`[getConsultants] Found ${rows.length} consultants`);
+    console.log(`[getConsultants] Found ${result.rows.length} consultants`);
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       console.log("[getConsultants] No consultants found, checking for any non-service vendors...");
 
       // Fallback query
-      const [fallbackRows] = await pool.query<RowDataPacket[]>(
-        "SELECT id, service_name, type, expertise_in FROM Vendor WHERE type <> 'Services' LIMIT 10"
+      const fallbackResult = await pool.query(
+        "SELECT id, service_name, type, expertise_in FROM vendor WHERE type <> 'Services' LIMIT 10"
       );
 
-      console.log(`[getConsultants] Found ${fallbackRows.length} non-service vendors`);
+      console.log(`[getConsultants] Found ${fallbackResult.rows.length} non-service vendors`);
 
-      if (fallbackRows.length > 0) {
-        const consultants: Consultant[] = fallbackRows.map((row) => ({
+      if (fallbackResult.rows.length > 0) {
+        const consultants: Consultant[] = fallbackResult.rows.map((row) => ({
           id: row.id || '',
           name: row.service_name || 'Consultant',
           type: (row.type as ConsultantType) || 'business',
@@ -46,7 +45,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const consultants: Consultant[] = rows.map((row) => ({
+    const consultants: Consultant[] = result.rows.map((row) => ({
       id: row.id || '',
       name: row.service_name || 'Consultant',
       type: (row.type as ConsultantType) || 'business',

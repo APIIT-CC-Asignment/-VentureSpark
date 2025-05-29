@@ -10,15 +10,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "All fields are required" }, { status: 400 });
     }
 
-    const connection = await pool.getConnection();
-    const [rows]: any = await connection.execute("SELECT * FROM users WHERE email = ?", [email]);
-    connection.release();
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json({ message: "Invalid email or password" }, { status: 401 });
     }
 
-    const user = rows[0];
+    const user = result.rows[0];
     console.log(`[loginpage] User found:`, {
       id: user.id,
       email: user.email,
@@ -46,8 +44,8 @@ export async function POST(req: Request) {
     if (user.typegroup === 'vendor') {
       // Check if there's a record in the Vendor table
       try {
-        const [vendorRows]: any = await connection.execute(
-          "SELECT id FROM Vendor WHERE id = ? OR email = ?",
+        const [vendorRows]: any = await pool.query(
+          "SELECT id FROM Vendor WHERE id = $1 OR email = $2",
           [user.id, user.email]
         );
 
@@ -73,17 +71,21 @@ export async function POST(req: Request) {
 
     // Return user information including typegroup and vendorId
     return NextResponse.json({
-      message: "Login successful",
+      success: true,
       token,
-      typegroup: user.typegroup,
-      vendorId: vendorId,
-      name: username,
-      email: user.email,
-      userId: user.id
+      user: {
+        id: user.id,
+        email: user.email,
+        username,
+        typegroup: user.typegroup,
+        vendorId: vendorId.toString()
+      }
     });
   } catch (error) {
-    console.error("Login Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ message: "Login failed", error: errorMessage }, { status: 500 });
+    console.error("Login error:", error);
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

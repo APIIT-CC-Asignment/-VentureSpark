@@ -1,7 +1,6 @@
 // File: src/app/api/vendor/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '../../lib/db';
-import { RowDataPacket, OkPacket } from 'mysql2';
 
 // GET method - Fetch vendor information
 export async function GET(req: NextRequest) {
@@ -20,27 +19,27 @@ export async function GET(req: NextRequest) {
 
     // If vendorId looks like an email, get the actual ID
     if (vendorId.includes('@')) {
-      const [userRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT id FROM users WHERE email = ? AND typegroup = ?',
+      const result = await pool.query(
+        'SELECT id FROM users WHERE email = $1 AND typegroup = $2',
         [vendorId, 'vendor']
       );
 
-      if (!userRows || userRows.length === 0) {
+      if (!result.rows || result.rows.length === 0) {
         return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
       }
 
-      userId = userRows[0].id;
+      userId = result.rows[0].id;
       console.log(`Resolved email ${vendorId} to user ID ${userId}`);
     }
 
-    // Join users and Vendor tables to get complete vendor info with all merged fields
-    const [rows] = await pool.execute<RowDataPacket[]>(`
+    // Join users and vendor tables to get complete vendor info with all merged fields
+    const result = await pool.query(`
       SELECT 
         u.id,
         u.username,
         u.email,
         u.typegroup,
-        u.createdAt as created_at,
+        u.createdat as created_at,
         v.service_name,
         v.years_of_excellence,
         v.contact_number,
@@ -64,84 +63,51 @@ export async function GET(req: NextRequest) {
         v.availability_slots,
         v.status
       FROM users u
-      LEFT JOIN Vendor v ON u.id = v.id
-      WHERE u.id = ? AND u.typegroup = 'vendor'
+      LEFT JOIN vendor v ON u.id = v.id
+      WHERE u.id = $1 AND u.typegroup = 'vendor'
     `, [userId]);
 
-    console.log('Combined query result:', rows);
+    console.log('Combined query result:', result.rows);
 
-    if (!rows || rows.length === 0) {
+    if (!result.rows || result.rows.length === 0) {
       return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
     }
 
     // If no vendor record exists, create a basic structure
-    const vendorData = rows[0];
-    if (!vendorData.service_name) {
-      // Return user data with empty vendor fields
-      const basicVendorData = {
-        id: vendorData.id,
-        username: vendorData.username,
-        email: vendorData.email,
-        typegroup: vendorData.typegroup,
-        created_at: vendorData.created_at,
-        service_name: '',
-        years_of_excellence: 0,
-        contact_number: '',
-        address: '',
-        selected_services: '',
-        type: '',
-        active: true,
-        expertise_in: '',
-        website_url: '',
-        portfolio_documents: '[]',
-        years_in_business: 0,
-        business_registration_number: '',
-        tax_identification_number: '',
-        social_media_links: '{}',
-        certifications: '[]',
-        profile_completion_percentage: 0,
-        verification_status: 'pending',
-        verification_notes: '',
-        reviewed_by: null,
-        reviewed_at: null,
-        availability_slots: null,
-        status: 'pending'
-      };
-      return NextResponse.json(basicVendorData);
-    }
-
+    const vendorData = result.rows[0];
     return NextResponse.json(vendorData);
+
   } catch (error) {
-    console.error('Error in vendor GET API:', error);
-    return NextResponse.json({
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Error fetching vendor:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
 // POST method - Create or update vendor profile
 export async function POST(req: NextRequest) {
-  let connection;
+  let client;
   try {
     const data = await req.json();
     console.log('POST to vendor API with data:', data);
 
     // Handle registration case
     if (data.password) {
-      // Get a connection for transaction
-      connection = await pool.getConnection();
-      await connection.beginTransaction();
+      // Get a client for transaction
+      client = await pool.connect();
+      await client.query('BEGIN');
 
       try {
         // Check if user already exists
-        const [existingUsers] = await connection.execute<RowDataPacket[]>(
-          'SELECT id FROM users WHERE email = ?',
+        const existingUsers = await client.query(
+          'SELECT id FROM users WHERE email = $1',
           [data.email]
         );
 
-        if (existingUsers.length > 0) {
-          await connection.rollback();
+        if (existingUsers.rows.length > 0) {
+          await client.query('ROLLBACK');
           return NextResponse.json(
             { error: 'User with this email already exists' },
             { status: 409 }
@@ -149,29 +115,18 @@ export async function POST(req: NextRequest) {
         }
 
         // Create user
-        const [userResult] = await connection.execute(
-          'INSERT INTO users (username, email, password, typegroup) VALUES (?, ?, ?, ?)',
+        const userResult = await client.query(
+          'INSERT INTO users (username, email, password, typegroup) VALUES ($1, $2, $3, $4) RETURNING id',
           [data.username, data.email, data.password, data.typegroup]
         );
 
-        // Get the inserted user's ID
-        const [newUser] = await connection.execute<RowDataPacket[]>(
-          'SELECT id FROM users WHERE email = ?',
-          [data.email]
-        );
-
-        if (!newUser || newUser.length === 0) {
-          await connection.rollback();
-          throw new Error('Failed to create user account');
-        }
-
-        const userId = newUser[0].id;
+        const userId = userResult.rows[0].id;
 
         // Create vendor profile
-        await connection.execute(
-          `INSERT INTO Vendor 
+        await client.query(
+          `INSERT INTO vendor 
             (id, service_name, years_of_excellence, email, contact_number, address, selected_services, type, active, expertise_in)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             userId,
             data.service_name,
@@ -187,7 +142,7 @@ export async function POST(req: NextRequest) {
         );
 
         // Commit the transaction
-        await connection.commit();
+        await client.query('COMMIT');
 
         return NextResponse.json({
           success: true,
@@ -196,10 +151,10 @@ export async function POST(req: NextRequest) {
         });
       } catch (error) {
         // Rollback the transaction on error
-        await connection.rollback();
+        await client.query('ROLLBACK');
         throw error;
       } finally {
-        connection.release();
+        client.release();
       }
     }
 
@@ -212,31 +167,31 @@ export async function POST(req: NextRequest) {
 
     // If only email is provided, get the ID
     if (!vendorId && data.email) {
-      const [userRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT id FROM users WHERE email = ? AND typegroup = ?',
+      const userResult = await pool.query(
+        'SELECT id FROM users WHERE email = $1 AND typegroup = $2',
         [data.email, 'vendor']
       );
 
-      if (!userRows || userRows.length === 0) {
+      if (!userResult.rows || userResult.rows.length === 0) {
         return NextResponse.json({ error: 'Vendor not found with provided email' }, { status: 404 });
       }
 
-      vendorId = userRows[0].id;
+      vendorId = userResult.rows[0].id;
     }
 
-    // Check if vendor record exists in Vendor table
-    const [checkResult] = await pool.execute<RowDataPacket[]>(
-      'SELECT id, email FROM Vendor WHERE id = ?',
+    // Check if vendor record exists in vendor table
+    const checkResult = await pool.query(
+      'SELECT id, email FROM vendor WHERE id = $1',
       [vendorId]
     );
 
     // Also check if the email already exists in another vendor record
-    const [emailCheckResult] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM Vendor WHERE email = ? AND id != ?',
+    const emailCheckResult = await pool.query(
+      'SELECT id FROM vendor WHERE email = $1 AND id != $2',
       [data.email, vendorId]
     );
 
-    if (emailCheckResult && emailCheckResult.length > 0) {
+    if (emailCheckResult.rows && emailCheckResult.rows.length > 0) {
       return NextResponse.json({
         error: `Email ${data.email} is already associated with another vendor account`
       }, { status: 409 });
@@ -249,7 +204,7 @@ export async function POST(req: NextRequest) {
     const availabilitySlots = data.availability_slots || null;
 
     let result;
-    if (checkResult && checkResult.length > 0) {
+    if (checkResult.rows && checkResult.rows.length > 0) {
       // Update existing vendor record with all merged fields
       console.log(`Updating vendor with service_name: "${data.service_name}"`);
 
@@ -257,28 +212,29 @@ export async function POST(req: NextRequest) {
       const serviceName = data.service_name;
       console.log(`Service name from request data: "${serviceName}"`);
 
-      result = await pool.execute<OkPacket>(
-        `UPDATE Vendor SET 
-          service_name = ?,
-          years_of_excellence = ?,
-          contact_number = ?,
-          address = ?,
-          selected_services = ?,
-          expertise_in = ?,
-          type = ?,
-          website_url = ?,
-          portfolio_documents = ?,
-          years_in_business = ?,
-          business_registration_number = ?,
-          tax_identification_number = ?,
-          social_media_links = ?,
-          certifications = ?,
-          profile_completion_percentage = ?,
-          verification_status = ?,
-          availability_slots = ?,
+      result = await pool.query(
+        `UPDATE vendor SET 
+          service_name = $1,
+          years_of_excellence = $2,
+          contact_number = $3,
+          address = $4,
+          selected_services = $5,
+          expertise_in = $6,
+          type = $7,
+          website_url = $8,
+          portfolio_documents = $9,
+          years_in_business = $10,
+          business_registration_number = $11,
+          tax_identification_number = $12,
+          social_media_links = $13,
+          certifications = $14,
+          profile_completion_percentage = $15,
+          verification_status = $16,
+          availability_slots = $17,
           status = 'pending',
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?`,
+        WHERE id = $18
+        RETURNING *`,
         [
           serviceName,
           data.years_of_excellence || 0,
@@ -300,30 +256,31 @@ export async function POST(req: NextRequest) {
           vendorId
         ]
       );
-      console.log(`Updated existing vendor record for ID ${vendorId}, affected rows: ${result[0].affectedRows}`);
+      console.log(`Updated existing vendor record for ID ${vendorId}`);
     } else {
-      // Check if this email already exists in Vendor table
-      const [emailExists] = await pool.execute<RowDataPacket[]>(
-        'SELECT id FROM Vendor WHERE email = ?',
+      // Check if this email already exists in vendor table
+      const emailExists = await pool.query(
+        'SELECT id FROM vendor WHERE email = $1',
         [data.email]
       );
 
-      if (emailExists && emailExists.length > 0) {
+      if (emailExists.rows && emailExists.rows.length > 0) {
         return NextResponse.json({
-          error: `Email ${data.email} is already registered in the Vendor table`
+          error: `Email ${data.email} is already registered in the vendor table`
         }, { status: 409 });
       }
 
       // Create new vendor record with all fields
       console.log(`Creating new vendor record with ID ${vendorId} and email ${data.email}`);
-      result = await pool.execute<OkPacket>(
-        `INSERT INTO Vendor 
+      result = await pool.query(
+        `INSERT INTO vendor 
           (id, service_name, years_of_excellence, email, contact_number, address, selected_services, expertise_in, 
            type, active, website_url, portfolio_documents, years_in_business, 
            business_registration_number, tax_identification_number, social_media_links, 
            certifications, profile_completion_percentage, verification_status, availability_slots, status,
            created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING *`,
         [
           vendorId,
           data.service_name || '',
@@ -348,32 +305,19 @@ export async function POST(req: NextRequest) {
           'pending'
         ]
       );
-      console.log(`Created new vendor record for ID ${vendorId}, affected rows: ${result[0].affectedRows}`);
-    }
-
-    // Fetch the updated record to return
-    const [updatedRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT * FROM Vendor WHERE id = ?`,
-      [vendorId]
-    );
-
-    // Return the updated vendor data
-    if (updatedRows && updatedRows.length > 0) {
-      console.log('Vendor data updated successfully:', updatedRows[0]);
-      return NextResponse.json(updatedRows[0]);
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Vendor information updated successfully',
-      vendorId
+      vendor: result.rows[0]
     });
+
   } catch (error) {
-    console.error('Error in vendor POST API:', error);
-    return NextResponse.json({
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Error in vendor API:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 

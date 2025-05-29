@@ -1,9 +1,8 @@
 // app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import pool from "../../../lib/db";
-import { RowDataPacket } from 'mysql2';
 
-interface User extends RowDataPacket {
+interface User {
     id: number;
     email: string;
     typegroup: string;
@@ -22,20 +21,20 @@ export async function POST(req: NextRequest) {
         }
 
         // Query database for user
-        const [rows] = await pool.query<User[]>(
-            `SELECT id, email, typegroup FROM users WHERE email = ? AND password = ?`,
+        const result = await pool.query<User>(
+            `SELECT id, email, typegroup FROM users WHERE email = $1 AND password = $2`,
             [email, password]
         );
 
         // Check if user exists
-        if (rows.length === 0) {
+        if (result.rows.length === 0) {
             return NextResponse.json(
                 { error: 'Invalid credentials' },
                 { status: 401 }
             );
         }
 
-        const user = rows[0];
+        const user = result.rows[0];
 
         // Ensure the user is a vendor/consultant
         if (user.typegroup !== 'vendor') {

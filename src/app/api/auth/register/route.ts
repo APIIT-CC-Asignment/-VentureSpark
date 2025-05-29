@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '../../../lib/db';
-import { RowDataPacket } from 'mysql2';
 import bcrypt from 'bcryptjs';
 
 export async function POST(req: NextRequest) {
@@ -19,12 +18,12 @@ export async function POST(req: NextRequest) {
 
         // Check if user already exists
         console.log('Checking for existing user with email:', email);
-        const [existingUsers] = await pool.execute<RowDataPacket[]>(
-            'SELECT id FROM users WHERE email = ?',
+        const result = await pool.query(
+            'SELECT id FROM users WHERE email = $1',
             [email]
         );
 
-        if (existingUsers.length > 0) {
+        if (result.rows.length > 0) {
             console.log('User already exists with email:', email);
             return NextResponse.json(
                 { error: 'User with this email already exists' },
@@ -38,48 +37,21 @@ export async function POST(req: NextRequest) {
 
         // Create user
         console.log('Creating new user...');
-        const [result] = await pool.execute(
-            'INSERT INTO users (username, email, password, typegroup) VALUES (?, ?, ?, ?)',
+        const insertResult = await pool.query(
+            'INSERT INTO users (username, email, password, typegroup) VALUES ($1, $2, $3, $4) RETURNING id',
             [username, email, hashedPassword, typegroup]
         );
         console.log('User created successfully');
 
-        // Get the inserted user's ID
-        console.log('Retrieving new user ID...');
-        const [newUser] = await pool.execute<RowDataPacket[]>(
-            'SELECT id FROM users WHERE email = ?',
-            [email]
-        );
-
-        if (!newUser || newUser.length === 0) {
-            console.error('Failed to retrieve new user ID after creation');
-            throw new Error('Failed to retrieve new user ID');
-        }
-
-        console.log('Registration successful for user ID:', newUser[0].id);
         return NextResponse.json({
             success: true,
-            userId: newUser[0].id,
-            message: 'User registered successfully'
+            userId: insertResult.rows[0].id
         });
 
     } catch (error) {
-        console.error('Registration error details:', {
-            name: error instanceof Error ? error.name : 'Unknown',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined
-        });
-
-        // Check if it's a database error
-        if (error instanceof Error && error.message.includes('ER_')) {
-            return NextResponse.json(
-                { error: 'Database error occurred. Please try again.' },
-                { status: 500 }
-            );
-        }
-
+        console.error('Registration error:', error);
         return NextResponse.json(
-            { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+            { error: 'Internal server error' },
             { status: 500 }
         );
     }

@@ -10,12 +10,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Missing bookingId or status' }, { status: 400 });
     }
 
-    const [result] = await pool.query(
-      'UPDATE booking SET status = ? WHERE id = ?',
+    const result = await pool.query(
+      'UPDATE booking SET status = $1 WHERE id = $2 RETURNING *',
       [status, bookingId]
     );
 
-    return NextResponse.json({ message: 'Booking status updated successfully' }, { status: 200 });
+    if (result.rows.length === 0) {
+      return NextResponse.json({ message: 'Booking not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: 'Booking status updated successfully', booking: result.rows[0] }, { status: 200 });
   } catch (error) {
     console.error('Error updating booking status:', error);
     return NextResponse.json(

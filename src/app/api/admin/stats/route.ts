@@ -1,62 +1,74 @@
 import { NextResponse } from 'next/server';
-import { RowDataPacket } from 'mysql2';
 import pool from '../../../lib/db';
 
 export async function GET() {
   try {
-    const [usersResult, servicesResult, bookingsResult, activeUsersResult,pendingBookingsResult] = await Promise.all([
-      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS totalUsers FROM Users WHERE typegroup <> "Admin"'),
-      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS totalServices FROM Vendor'),
-      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS totalBookings FROM booking '),
-      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS activeUsers FROM Users'),
-      pool.query<RowDataPacket[]>('SELECT COUNT(*) AS pendingBookings FROM booking WHERE status = "pending"'),
-    ]);
+    // 1. Total users count
+    const usersResult = await pool.query('SELECT COUNT(*) as count FROM users');
+    const totalUsers = parseInt(usersResult.rows[0].count);
 
-    const totalUsers = usersResult[0][0].totalUsers;
-    const totalServices = servicesResult[0][0].totalServices;
-    const totalBookings = bookingsResult[0][0].totalBookings;
-    const activeUsers = activeUsersResult[0][0].activeUsers;
-    const pendingBookings = pendingBookingsResult[0][0].pendingBookings ;
+    // 2. Total services count
+    const servicesResult = await pool.query('SELECT COUNT(*) as count FROM vendor');
+    const totalServices = parseInt(servicesResult.rows[0].count);
 
-    const [monthlyStatsResult] = await pool.query<RowDataPacket[]>(`
+    // 3. Total bookings count
+    const bookingsResult = await pool.query('SELECT COUNT(*) as count FROM booking');
+    const totalBookings = parseInt(bookingsResult.rows[0].count);
+
+    // 4. Pending bookings count
+    const pendingBookingsResult = await pool.query(
+      "SELECT COUNT(*) as count FROM booking WHERE status = 'pending'"
+    );
+    const pendingBookings = parseInt(pendingBookingsResult.rows[0].count);
+
+    // 5. Monthly data
+    const monthlyDataResult = await pool.query(`
       SELECT 
-        DATE_FORMAT(request_date, '%b %Y') AS month,
-        COUNT(DISTINCT id) AS users,
-        COUNT(*) AS bookings
+        DATE_TRUNC('month', request_date) as month,
+        COUNT(*) as count
       FROM booking
-      WHERE request_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-      GROUP BY DATE_FORMAT(request_date, '%b %Y')
-      ORDER BY MIN(request_date)
+      GROUP BY DATE_TRUNC('month', request_date)
+      ORDER BY month DESC
+      LIMIT 12
     `);
-    
-    const monthlyData = {
-      labels: monthlyStatsResult.map(row => row.month),
-      users: monthlyStatsResult.map(row => row.users),
-      bookings: monthlyStatsResult.map(row => row.bookings),
-      revenue: [500, 700, 900, 1200, 1000, 1100], 
-    };
 
-   
-    const [serviceDistResult] = await pool.query<RowDataPacket[]>(`
-      SELECT Requstedservice AS label, COUNT(*) AS count
-      FROM booking
-      GROUP BY Requstedservice
+    const monthlyData = monthlyDataResult.rows.map(row => ({
+      month: row.month,
+      count: parseInt(row.count)
+    }));
+
+    // 6. Service distribution
+    const serviceDistResult = await pool.query(`
+      SELECT 
+        type as label,
+        COUNT(*) as count
+      FROM vendor
+      GROUP BY type
+      ORDER BY count DESC
     `);
 
     const serviceDistribution = {
-      labels: serviceDistResult.map(row => row.label),
-      data: serviceDistResult.map(row => row.count),
+      labels: serviceDistResult.rows.map(row => row.label),
+      data: serviceDistResult.rows.map(row => parseInt(row.count))
     };
 
-    // 3. Recent bookings
-    const [recentBookingsResult] = await pool.query<RowDataPacket[]>(`
-      SELECT id, name, email, request_date, status, Requstedservice, what_you_need, committed
+    // 7. Recent bookings
+    const recentBookingsResult = await pool.query(`
+      SELECT 
+        id, 
+        name, 
+        email, 
+        request_date, 
+        status, 
+        Requstedservice, 
+        what_you_need, 
+        committed
       FROM booking
       ORDER BY request_date DESC
       LIMIT 5
     `);
 
-    const recentBookings = recentBookingsResult.map(row => ({
+    const recentBookings = recentBookingsResult.rows.map(row => ({
       id: row.id,
       name: row.name,
       email: row.email,
@@ -64,18 +76,18 @@ export async function GET() {
       status: row.status,
       Requstedservice: row.Requstedservice,
       whatYouNeed: row.what_you_need,
-      committed: row.committed,
+      committed: row.committed
     }));
 
     const stats = {
       totalUsers,
       totalServices,
       totalBookings,
-      totalRevenue: 0, 
+      totalRevenue: 0,
       monthlyData,
       serviceDistribution,
       recentBookings,
-      pendingBookings,
+      pendingBookings
     };
 
     return NextResponse.json(stats, { status: 200 });
