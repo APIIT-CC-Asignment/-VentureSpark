@@ -330,6 +330,8 @@ const VendorDashboard: React.FC = () => {
 
       setIsLoading(true);
       try {
+        console.log('Starting saveAvailability with vendorId:', vendorId, 'type:', typeof vendorId); // Debug
+
         // Convert time slots to full datetime
         const availabilitySlots = timeSlots.map(time => {
           const [hours, minutes] = time.split(':').map(Number);
@@ -345,34 +347,67 @@ const VendorDashboard: React.FC = () => {
           };
         });
 
-        const response = await fetch('/api/vendor-availability', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            vendorId,
-            availabilitySlots
-          })
-        });
+        console.log('Generated availability slots:', availabilitySlots); // Debug
 
-        if (response.ok) {
-          const result = await response.json();
-          setFeedback({ type: 'success', message: result.message });
-          setTimeSlots([]);
-          // Force refresh of availability data
-          const now = Date.now();
-          setLastFetchTime(now - 6000); // Ensures a fetch will happen on next render
-          await fetchAvailabilities();
-        } else {
-          const error = await response.json();
-          setFeedback({ type: 'error', message: error.error });
+        // Send each slot individually (API expects one slot per request)
+        let successCount = 0;
+        const totalSlots = availabilitySlots.length;
+
+        console.log('About to send slots. VendorId type:', typeof vendorId, 'Value:', vendorId); // Debug
+
+        for (const slot of availabilitySlots) {
+          const requestData = {
+            vendor_id: String(vendorId), // Changed from vendorId to vendor_id
+            start_time: slot.startTime,
+            end_time: slot.endTime
+          };
+
+          console.log('Sending individual slot:', JSON.stringify(requestData, null, 2)); // Debug log
+
+          const response = await fetch('/api/vendor-availability', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+          });
+
+          console.log('Response status:', response.status); // Debug
+          console.log('Response headers:', Object.fromEntries(response.headers.entries())); // Debug
+
+          if (!response.ok) {
+            let error;
+            try {
+              error = await response.json();
+            } catch (parseError) {
+              console.error('Failed to parse error response:', parseError);
+              error = { error: `HTTP ${response.status} ${response.statusText}` };
+            }
+            console.error('API Error for slot:', error); // Debug log
+
+            // Check if we got a meaningful error message
+            const errorMessage = error?.error || error?.message || `Failed to save availability slot ${successCount + 1}/${totalSlots}`;
+            throw new Error(errorMessage);
+          }
+
+          successCount++;
         }
+
+        console.log(`Successfully saved ${successCount}/${totalSlots} slots`); // Debug log
+
+        setFeedback({ type: 'success', message: `Successfully saved ${successCount} availability slots!` });
+        setTimeSlots([]);
+        // Force refresh of availability data
+        const now = Date.now();
+        setLastFetchTime(now - 6000);
+        await fetchAvailabilities();
+
       } catch (error) {
-        setFeedback({ type: 'error', message: 'Failed to save availability' });
+        console.error('Error saving availability:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to save availability';
+        setFeedback({ type: 'error', message: errorMessage });
       } finally {
         setIsLoading(false);
       }
     };
-
     // Delete availability with fixed handling
     const deleteAvailability = async (slotId: string) => {
       if (isDeleting) return; // Prevent concurrent deletion requests
@@ -735,8 +770,8 @@ const VendorDashboard: React.FC = () => {
                                       className="inline-flex items-center group"
                                     >
                                       <span className={`text-xs font-medium px-3 py-1 rounded-full ${slot.is_booked
-                                          ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
-                                          : 'bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white'
+                                        ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-[#1E3A8A] to-[#10B981] text-white'
                                         }`}>
                                         {formatTimeOnly(slot.start_time)} - {formatTimeOnly(slot.end_time)}
                                         {slot.is_booked && ' (Booked)'}
@@ -992,11 +1027,12 @@ const VendorDashboard: React.FC = () => {
     }
   };
 
+  // Fix for the fetchVendorProfile function
   const fetchVendorProfile = async () => {
     try {
-      // Using query parameter to match your API structure
+      // FIX: Use the correct profile API endpoint
       const encodedVendorId = encodeURIComponent(String(auth.vendorId));
-      const response = await fetch(`/api/vendor?vendorId=${encodedVendorId}`);
+      const response = await fetch(`/api/vendor-profile?vendorId=${encodedVendorId}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -1006,9 +1042,9 @@ const VendorDashboard: React.FC = () => {
           throw new Error('Invalid vendor profile data received');
         }
 
-        // Ensure all required fields are present with default values if missing
+        // Map the profile data correctly
         const validatedProfile = {
-          id: data.id || '',
+          id: data.vendor_id || '', // Note: profile API returns vendor_id
           vendor_id: data.vendor_id || auth.vendorId,
           website_url: data.website_url || '',
           portfolio_documents: data.portfolio_documents || '[]',
@@ -1041,7 +1077,7 @@ const VendorDashboard: React.FC = () => {
           social_media_links: '{}',
           certifications: '[]',
           profile_completion_percentage: 0,
-          verification_status: 'pending',
+          verification_status: 'pending' as const,
           verification_notes: '',
           reviewed_by: null,
           reviewed_at: null,
@@ -1070,7 +1106,7 @@ const VendorDashboard: React.FC = () => {
         social_media_links: '{}',
         certifications: '[]',
         profile_completion_percentage: 0,
-        verification_status: 'pending',
+        verification_status: 'pending' as const,
         verification_notes: '',
         reviewed_by: null,
         reviewed_at: null,
@@ -1079,6 +1115,103 @@ const VendorDashboard: React.FC = () => {
       };
       setVendorProfile(defaultProfile);
       setEditableProfile(defaultProfile);
+    }
+  };
+
+  // Fix for the handleProfileSave function
+  const handleProfileSave = async () => {
+    if (!editableProfile) return;
+
+    setIsSubmitting(true);
+    try {
+      // Prepare the profile data
+      const profileData = {
+        vendor_id: editableProfile.vendor_id,
+        website_url: editableProfile.website_url || null,
+        portfolio_documents: editableProfile.portfolio_documents || '[]',
+        years_in_business: editableProfile.years_in_business || 0,
+        business_registration_number: editableProfile.business_registration_number || null,
+        tax_identification_number: editableProfile.tax_identification_number || null,
+        social_media_links: editableProfile.social_media_links || '{}',
+        certifications: editableProfile.certifications || '[]'
+      };
+
+      console.log('Sending profile data:', profileData);
+
+      const response = await fetch('/api/vendor-profile', {
+        method: editableProfile.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData)
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        console.error('Server response:', responseData);
+        throw new Error(responseData.error || 'Failed to save profile');
+      }
+
+      console.log('Profile updated successfully:', responseData);
+
+      // Update both profile states with the server response
+      setVendorProfile(responseData);
+      setEditableProfile(responseData);
+      setIsEditing(false);
+      setFeedback({ type: 'success', message: 'Profile updated successfully!' });
+
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save profile. Please try again.';
+      setFeedback({ type: 'error', message: errorMessage });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Also fix the basic vendor info save (if you have one)
+  const handleBasicInfoSave = async () => {
+    if (!vendorInfo) return;
+
+    setIsSubmitting(true);
+    try {
+      // Use /api/vendor for basic info updates
+      const response = await fetch(`/api/vendor`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: vendorInfo.id,
+          email: vendorInfo.email,
+          service_name: vendorInfo.service_name,
+          years_of_excellence: vendorInfo.years_of_excellence,
+          contact_number: vendorInfo.contact_number,
+          address: vendorInfo.address,
+          expertise_in: vendorInfo.expertise_in,
+          selected_services: vendorInfo.selected_services,
+          type: vendorInfo.type,
+          active: vendorInfo.active
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Updated vendor info:', result);
+
+        // Update vendorInfo state immediately
+        if (result.vendor) {
+          setVendorInfo(result.vendor);
+        }
+
+        setFeedback({ type: 'success', message: 'Basic information updated successfully!' });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save basic information');
+      }
+    } catch (error) {
+      console.error('Error saving basic info:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save basic information. Please try again.';
+      setFeedback({ type: 'error', message: errorMessage });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1155,75 +1288,6 @@ const VendorDashboard: React.FC = () => {
           };
         });
       }
-    }
-  };
-
-  const handleProfileSave = async () => {
-    if (!editableProfile) return;
-
-    setIsSubmitting(true);
-    try {
-      let url, method;
-
-      if (editableProfile.id) {
-        // Update existing profile
-        url = `/api/vendor`;
-        method = 'PUT';
-      } else {
-        // Create new profile
-        url = `/api/vendor`;
-        method = 'POST';
-      }
-
-      // Combine vendorInfo and editableProfile to ensure all fields are updated
-      const updatedData = {
-        ...vendorInfo,
-        ...editableProfile,
-        id: vendorInfo?.id || editableProfile.id,
-        email: vendorInfo?.email,
-        // Explicitly include service_name to ensure it's updated
-        service_name: vendorInfo?.service_name
-      };
-
-      console.log('Sending data to update vendor:', updatedData);
-
-      const response = await fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData)
-      });
-
-      if (response.ok) {
-        const updatedProfile = await response.json();
-        console.log('Updated profile received:', updatedProfile);
-
-        // Update both vendorProfile and vendorInfo states
-        setVendorProfile(updatedProfile);
-        setEditableProfile(updatedProfile);
-
-        // Update vendorInfo with the new service_name and other fields
-        setVendorInfo(prevInfo => ({
-          ...prevInfo,
-          ...updatedProfile
-        }));
-
-        setIsEditing(false);
-        setFeedback({ type: 'success', message: 'Profile updated successfully!' });
-
-        // Reload data after a short delay to ensure we get the latest from the server
-        setTimeout(() => {
-          loadVendorData();
-        }, 1000);
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save profile');
-      }
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save profile. Please try again.';
-      setFeedback({ type: 'error', message: errorMessage });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

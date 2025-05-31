@@ -3,19 +3,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from "../../lib/db";
 
 function calculateCompletionPercentage(data: any): number {
-    // Fields to check for completion
-    const fields = [
-        !!data.website_url,
-        !!data.business_registration_number,
-        !!data.tax_identification_number,
-        data.years_in_business > 0,
-        data.portfolio_documents && data.portfolio_documents !== '[]',
-        data.social_media_links && data.social_media_links !== '{}',
-        data.certifications && data.certifications !== '[]'
-    ];
+    try {
+        // Fields to check for completion
+        const fields = [
+            !!data.website_url,
+            !!data.business_registration_number,
+            !!data.tax_identification_number,
+            data.years_in_business > 0,
+            data.portfolio_documents && data.portfolio_documents !== '[]',
+            data.social_media_links && data.social_media_links !== '{}',
+            data.certifications && data.certifications !== '[]'
+        ];
 
-    const filledFields = fields.filter(Boolean).length;
-    return Math.round((filledFields / fields.length) * 100);
+        const filledFields = fields.filter(Boolean).length;
+        return Math.round((filledFields / fields.length) * 100);
+    } catch (error) {
+        console.error('Error calculating completion percentage:', error);
+        return 0;
+    }
 }
 
 // GET /api/vendor/profile - Fetch vendor profile data
@@ -57,7 +62,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(result.rows[0]);
     } catch (error) {
         console.error('Error fetching vendor profile:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Internal server error: ${errorMessage}` }, { status: 500 });
     }
 }
 
@@ -65,6 +71,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const data = await req.json();
+        console.log('Received data for creation:', data); // Debug log
 
         if (!data.vendor_id) {
             return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
@@ -111,10 +118,15 @@ export async function POST(req: NextRequest) {
             ]
         );
 
+        if (!result.rows || result.rows.length === 0) {
+            return NextResponse.json({ error: 'Failed to create vendor profile' }, { status: 500 });
+        }
+
         return NextResponse.json(result.rows[0], { status: 201 });
     } catch (error) {
         console.error('Error creating vendor profile:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Internal server error: ${errorMessage}` }, { status: 500 });
     }
 }
 
@@ -122,6 +134,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         const data = await req.json();
+        console.log('Received data for update:', data); // Debug log
 
         if (!data.vendor_id) {
             return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
@@ -129,6 +142,16 @@ export async function PUT(req: NextRequest) {
 
         // Calculate completion percentage
         const completionPercentage = calculateCompletionPercentage(data);
+
+        // First check if vendor exists
+        const vendorCheck = await pool.query(
+            'SELECT id FROM vendor WHERE id = $1',
+            [data.vendor_id]
+        );
+
+        if (!vendorCheck.rows || vendorCheck.rows.length === 0) {
+            return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
+        }
 
         // Update the vendor record
         const updateResult = await pool.query(
@@ -143,7 +166,8 @@ export async function PUT(req: NextRequest) {
                 profile_completion_percentage = $8,
                 verification_status = 'pending',
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $9`,
+            WHERE id = $9
+            RETURNING *`,
             [
                 data.website_url || null,
                 data.portfolio_documents || '[]',
@@ -157,36 +181,14 @@ export async function PUT(req: NextRequest) {
             ]
         );
 
-        if (updateResult.rowCount === 0) {
-            return NextResponse.json({ error: 'Vendor profile not found' }, { status: 404 });
+        if (!updateResult.rows || updateResult.rows.length === 0) {
+            return NextResponse.json({ error: 'Failed to update vendor profile' }, { status: 500 });
         }
 
-        // Return the updated profile
-        const profileResult = await pool.query(
-            `SELECT 
-                id as vendor_id,
-                website_url,
-                portfolio_documents,
-                years_in_business,
-                business_registration_number,
-                tax_identification_number,
-                social_media_links,
-                certifications,
-                profile_completion_percentage,
-                verification_status,
-                verification_notes,
-                reviewed_by,
-                reviewed_at,
-                created_at,
-                updated_at
-            FROM vendor
-            WHERE id = $1`,
-            [data.vendor_id]
-        );
-
-        return NextResponse.json(profileResult.rows[0]);
+        return NextResponse.json(updateResult.rows[0]);
     } catch (error) {
         console.error('Error updating vendor profile:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: `Internal server error: ${errorMessage}` }, { status: 500 });
     }
 }

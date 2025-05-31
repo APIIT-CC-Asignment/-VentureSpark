@@ -52,15 +52,15 @@ export async function GET(req: NextRequest) {
         // Get vendor's availability
         console.log(`Executing SQL query for vendorId: ${actualVendorId}`);
         const query = `SELECT 
-            id,
-            vendor_id,
-            start_time,
-            end_time,
-            created_at,
-            updated_at
-        FROM vendor_availability 
+        id,
+        vendor_id,
+        start_time,
+        end_time,
+        created_at,
+        updated_at
+      FROM vendor_availability 
         WHERE vendor_id = $1 
-        ORDER BY start_time ASC`;
+      ORDER BY start_time ASC`;
 
         console.log(`SQL Query: ${query}`);
         console.log(`With parameter: ${actualVendorId}`);
@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
         // Insert new availability slot
         const result = await pool.query(
             `INSERT INTO vendor_availability 
-            (id, vendor_id, start_time, end_time, created_at, updated_at)
+                (id, vendor_id, start_time, end_time, created_at, updated_at)
             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING *`,
             [slotId, vendor_id, start_time, end_time]
