@@ -208,6 +208,9 @@ export async function GET(req: NextRequest) {
 }
 
 // POST method - Create new availability slot
+// File: src/app/api/vendor-availability/route.ts
+// Updated POST method with better vendor ID resolution
+
 export async function POST(req: NextRequest) {
     try {
         const data = await req.json();
@@ -220,21 +223,118 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        console.log('POST vendor-availability received data:', { vendor_id, start_time, end_time });
+
+        // CRITICAL FIX: Resolve vendor_id to numeric ID if it's an email
+        let actualVendorId = vendor_id;
+
+        if (typeof vendor_id === 'string' && vendor_id.includes('@')) {
+            console.log(`Resolving email to vendorId: ${vendor_id}`);
+
+            // First try users table
+            const userResult = await pool.query(
+                'SELECT id FROM users WHERE email = $1 AND typegroup = $2',
+                [vendor_id, 'vendor']
+            );
+
+            if (userResult.rows && userResult.rows.length > 0) {
+                actualVendorId = userResult.rows[0].id;
+                console.log(`Resolved email to vendorId from users table: ${actualVendorId}`);
+            } else {
+                // Try vendor table as fallback
+                const vendorResult = await pool.query(
+                    'SELECT id FROM vendor WHERE email = $1',
+                    [vendor_id]
+                );
+
+                if (vendorResult.rows && vendorResult.rows.length > 0) {
+                    actualVendorId = vendorResult.rows[0].id;
+                    console.log(`Resolved email to vendorId from vendor table: ${actualVendorId}`);
+                } else {
+                    console.error(`No vendor found with email: ${vendor_id}`);
+                    return NextResponse.json(
+                        { error: `No vendor found with email: ${vendor_id}` },
+                        { status: 404 }
+                    );
+                }
+            }
+        }
+
+        // Ensure actualVendorId is a number
+        const numericVendorId = Number(actualVendorId);
+        if (isNaN(numericVendorId)) {
+            console.error(`Invalid vendor ID: ${actualVendorId}`);
+            return NextResponse.json(
+                { error: `Invalid vendor ID: ${actualVendorId}` },
+                { status: 400 }
+            );
+        }
+
+        console.log(`Using numeric vendor ID: ${numericVendorId}`);
+
+        // Validate date formats
+        const startDate = new Date(start_time);
+        const endDate = new Date(end_time);
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            return NextResponse.json(
+                { error: 'Invalid date format for start_time or end_time' },
+                { status: 400 }
+            );
+        }
+
+        // Check for conflicts with existing availability
+        const conflictCheck = await pool.query(
+            `SELECT id FROM vendor_availability 
+             WHERE vendor_id = $1 
+             AND (
+                 (start_time <= $2 AND end_time > $2) OR
+                 (start_time < $3 AND end_time >= $3) OR
+                 (start_time >= $2 AND end_time <= $3)
+             )`,
+            [numericVendorId, start_time, end_time]
+        );
+
+        if (conflictCheck.rows.length > 0) {
+            return NextResponse.json(
+                { error: 'Time slot conflicts with existing availability' },
+                { status: 409 }
+            );
+        }
+
         // Generate UUID for the new slot
         const slotId = uuidv4();
 
         // Insert new availability slot
+        console.log('Inserting availability slot with data:', {
+            slotId,
+            numericVendorId,
+            start_time,
+            end_time
+        });
+
         const result = await pool.query(
             `INSERT INTO vendor_availability 
                 (id, vendor_id, start_time, end_time, created_at, updated_at)
             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING *`,
-            [slotId, vendor_id, start_time, end_time]
+            [slotId, numericVendorId, start_time, end_time]
         );
 
+        console.log('Successfully created availability slot:', result.rows[0]);
         return NextResponse.json(result.rows[0]);
+
     } catch (error) {
         console.error('Error creating availability slot:', error);
+
+        // Provide more specific error messages
+        if (error instanceof Error && error.message.includes('22P02')) {
+            return NextResponse.json(
+                { error: 'Invalid data type - vendor_id must be numeric' },
+                { status: 400 }
+            );
+        }
+
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

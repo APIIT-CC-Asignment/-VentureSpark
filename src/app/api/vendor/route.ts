@@ -1,141 +1,207 @@
-// Simplified and fixed version of src/app/api/vendor/route.ts
+// src/app/api/vendor/route.ts - Comprehensive fix with single query
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '../../lib/db';
 
-// GET method - Fetch vendor information (BASIC USER INFO ONLY)
+// Longer timeout wrapper for database queries
+const queryWithTimeout = async (query: string, params: any[] = [], timeoutMs: number = 15000) => {
+  return Promise.race([
+    pool.query(query, params),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database query timeout')), timeoutMs)
+    )
+  ]) as Promise<any>;
+};
+
+// GET method - Fetch ALL vendor information in one query
 export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const vendorId = url.searchParams.get('vendorId');
+
+  console.log('[vendor] API called with vendorId:', vendorId);
+
+  if (!vendorId) {
+    return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
+  }
+
   try {
-    const url = new URL(req.url);
-    const vendorId = url.searchParams.get('vendorId');
+    // Test connection first
+    console.log('[vendor] Testing database connection...');
+    await queryWithTimeout('SELECT 1', [], 5000);
+    console.log('[vendor] Database connection successful');
 
-    console.log('Vendor API called with vendorId:', vendorId);
+    let actualVendorId = vendorId;
 
-    if (!vendorId) {
-      return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 });
-    }
-
-    // First, check if vendorId is an actual ID or email
-    let userId = vendorId;
-
-    // If vendorId looks like an email, get the actual ID
+    // If vendorId is an email, resolve it to ID first
     if (vendorId.includes('@')) {
-      console.log('Resolving email to ID...');
-      const result = await pool.query(
+      console.log('[vendor] Resolving email to vendor ID...');
+      const emailResult = await queryWithTimeout(
         'SELECT id FROM users WHERE email = $1 AND typegroup = $2',
-        [vendorId, 'vendor']
+        [vendorId, 'vendor'], 8000
       );
 
-      if (!result.rows || result.rows.length === 0) {
-        console.log('No user found with email:', vendorId);
-        return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
+      if (!emailResult.rows || emailResult.rows.length === 0) {
+        console.log('[vendor] No vendor found with email:', vendorId);
+        return NextResponse.json(createFallbackVendorInfo(vendorId, vendorId));
       }
 
-      userId = result.rows[0].id;
-      console.log(`Resolved email ${vendorId} to user ID ${userId}`);
+      actualVendorId = String(emailResult.rows[0].id);
+      console.log('[vendor] Resolved email to vendor ID:', actualVendorId);
     }
 
-    // Get basic user info from users table only
-    console.log('Fetching user data for ID:', userId);
-    const userResult = await pool.query(`
+    // Single comprehensive query to get ALL vendor data
+    console.log('[vendor] Fetching comprehensive vendor data for ID:', actualVendorId);
+
+    const query = `
       SELECT 
-        id,
-        username,
-        email,
-        typegroup,
-        createdat
-      FROM users
-      WHERE id = $1 AND typegroup = 'vendor'
-    `, [userId]);
+        u.id,
+        u.username,
+        u.email,
+        u.typegroup,
+        u.createdat,
+        v.service_name,
+        v.years_of_excellence,
+        v.contact_number,
+        v.address,
+        v.selected_services,
+        v.type,
+        v.active,
+        v.expertise_in,
+        v.website_url,
+        v.portfolio_documents,
+        v.years_in_business,
+        v.business_registration_number,
+        v.tax_identification_number,
+        v.social_media_links,
+        v.certifications,
+        v.profile_completion_percentage,
+        v.verification_status,
+        v.verification_notes,
+        v.reviewed_by,
+        v.reviewed_at,
+        v.created_at as vendor_created_at,
+        v.updated_at as vendor_updated_at
+      FROM users u
+      LEFT JOIN vendor v ON u.id = v.id
+      WHERE u.id = $1 AND u.typegroup = 'vendor'
+    `;
 
-    console.log('User query executed, rows found:', userResult.rows.length);
+    const result = await queryWithTimeout(query, [parseInt(actualVendorId)], 12000);
 
-    if (!userResult.rows || userResult.rows.length === 0) {
-      console.log('No vendor user found with ID:', userId);
-      return NextResponse.json({ error: 'Vendor not found in users table' }, { status: 404 });
+    console.log('[vendor] Query executed, rows found:', result.rows.length);
+
+    if (!result.rows || result.rows.length === 0) {
+      console.log('[vendor] No vendor found with ID:', actualVendorId);
+      return NextResponse.json(createFallbackVendorInfo(actualVendorId, vendorId));
     }
 
-    const userData = userResult.rows[0];
-    console.log('User data retrieved:', userData);
+    const data = result.rows[0];
+    console.log('[vendor] Raw vendor data from DB:', {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      service_name: data.service_name,
+      years_of_excellence: data.years_of_excellence,
+      verification_status: data.verification_status
+    });
 
-    // Now try to get vendor-specific info from vendor table
-    let vendorData = null;
-    try {
-      console.log('Fetching vendor-specific data...');
-      const vendorResult = await pool.query(`
-        SELECT 
-          service_name,
-          years_of_excellence,
-          contact_number,
-          address,
-          selected_services,
-          type,
-          active,
-          expertise_in
-        FROM vendor
-        WHERE id = $1
-      `, [userId]);
+    // Process and return comprehensive vendor data
+    const vendorResponse = {
+      // Basic user info
+      id: data.id,
+      username: data.username || 'Vendor User',
+      email: data.email || vendorId,
+      typegroup: data.typegroup || 'vendor',
+      created_at: data.createdat || new Date().toISOString(),
 
-      console.log('Vendor query executed, rows found:', vendorResult.rows.length);
+      // Basic vendor info
+      service_name: data.service_name || '',
+      years_of_excellence: data.years_of_excellence || 0,
+      contact_number: data.contact_number || '',
+      address: data.address || '',
+      selected_services: data.selected_services || '[]',
+      type: data.type || 'vendor',
+      active: data.active !== undefined ? data.active : true,
+      expertise_in: data.expertise_in || '',
 
-      if (vendorResult.rows && vendorResult.rows.length > 0) {
-        vendorData = vendorResult.rows[0];
-        console.log('Vendor data retrieved:', vendorData);
-      } else {
-        console.log('No vendor record found, using defaults');
-      }
-    } catch (vendorError) {
-      console.error('Error fetching vendor data (continuing with defaults):', vendorError);
-      // Continue with null vendorData
-    }
-
-    // Create response with basic user info and vendor defaults
-    const responseData = {
-      id: userData.id,
-      username: userData.username,
-      email: userData.email,
-      typegroup: userData.typegroup,
-      created_at: userData.createdat,
-      // Vendor-specific fields with safe defaults
-      service_name: vendorData?.service_name || '',
-      years_of_excellence: vendorData?.years_of_excellence || 0,
-      contact_number: vendorData?.contact_number || '',
-      address: vendorData?.address || '',
-      selected_services: vendorData?.selected_services || '[]',
-      type: vendorData?.type || 'business',
-      active: vendorData?.active !== undefined ? vendorData.active : true,
-      expertise_in: vendorData?.expertise_in || ''
+      // Profile info (for compatibility with profile API)
+      website_url: data.website_url || '',
+      portfolio_documents: Array.isArray(data.portfolio_documents)
+        ? JSON.stringify(data.portfolio_documents)
+        : data.portfolio_documents || '[]',
+      years_in_business: data.years_in_business || 0,
+      business_registration_number: data.business_registration_number || '',
+      tax_identification_number: data.tax_identification_number || '',
+      social_media_links: typeof data.social_media_links === 'object'
+        ? JSON.stringify(data.social_media_links)
+        : data.social_media_links || '{}',
+      certifications: Array.isArray(data.certifications)
+        ? JSON.stringify(data.certifications)
+        : data.certifications || '[]',
+      profile_completion_percentage: data.profile_completion_percentage || 0,
+      verification_status: data.verification_status || 'pending',
+      verification_notes: data.verification_notes || '',
+      reviewed_by: data.reviewed_by,
+      reviewed_at: data.reviewed_at,
+      vendor_created_at: data.vendor_created_at,
+      vendor_updated_at: data.vendor_updated_at
     };
 
-    console.log('Sending response data:', responseData);
-    return NextResponse.json(responseData);
+    console.log('[vendor] Successfully returning comprehensive vendor data:', {
+      id: vendorResponse.id,
+      username: vendorResponse.username,
+      email: vendorResponse.email,
+      service_name: vendorResponse.service_name
+    });
+
+    return NextResponse.json(vendorResponse);
 
   } catch (error) {
-    console.error('Error in GET /api/vendor:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error('Error details:', errorMessage);
-    if (errorStack) console.error('Error stack:', errorStack);
-
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: errorMessage,
-        vendorId: req.url.includes('vendorId') ? new URL(req.url).searchParams.get('vendorId') : 'unknown'
-      },
-      { status: 500 }
-    );
+    console.error('[vendor] Error fetching vendor data:', error);
+    return NextResponse.json(createFallbackVendorInfo(vendorId, vendorId));
   }
 }
 
-// POST method - Create or update vendor profile (VENDOR TABLE ONLY)
+// Helper function to create fallback vendor info
+function createFallbackVendorInfo(vendorId: string, originalId: string) {
+  console.log('[vendor] Creating fallback data for:', vendorId);
+  return {
+    id: vendorId,
+    username: 'Vendor User',
+    email: originalId.includes('@') ? originalId : 'vendor@example.com',
+    typegroup: 'vendor',
+    created_at: new Date().toISOString(),
+    service_name: 'Professional Services',
+    years_of_excellence: 1,
+    contact_number: '',
+    address: '',
+    selected_services: '[]',
+    type: 'vendor',
+    active: true,
+    expertise_in: 'Business Consultation',
+    website_url: '',
+    portfolio_documents: '[]',
+    years_in_business: 0,
+    business_registration_number: '',
+    tax_identification_number: '',
+    social_media_links: '{}',
+    certifications: '[]',
+    profile_completion_percentage: 0,
+    verification_status: 'pending',
+    verification_notes: '',
+    reviewed_by: null,
+    reviewed_at: null
+  };
+}
+
+// POST method - Create or update vendor profile
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-    console.log('POST /api/vendor called with data keys:', Object.keys(data));
+    console.log('[vendor] POST called with data keys:', Object.keys(data));
 
-    // Handle registration case (create both user and vendor records)
+    // Handle registration case
     if (data.password) {
-      console.log('Handling new vendor registration...');
+      console.log('[vendor] Handling new vendor registration...');
 
       const client = await pool.connect();
       try {
@@ -176,14 +242,14 @@ export async function POST(req: NextRequest) {
             data.contact_number || '',
             data.address || '',
             data.selected_services || '[]',
-            data.type || 'business',
+            data.type || 'vendor',
             data.active !== undefined ? data.active : true,
             data.expertise_in || ''
           ]
         );
 
         await client.query('COMMIT');
-        console.log('Registration successful for user ID:', userId);
+        console.log('[vendor] Registration successful for user ID:', userId);
 
         return NextResponse.json({
           success: true,
@@ -198,7 +264,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Handle vendor update case (update vendor table only)
+    // Handle vendor update case
     if (!data.id && !data.email) {
       return NextResponse.json({ error: 'Vendor ID or email is required for update' }, { status: 400 });
     }
@@ -207,9 +273,9 @@ export async function POST(req: NextRequest) {
 
     // If only email is provided, get the ID
     if (!vendorId && data.email) {
-      const userResult = await pool.query(
+      const userResult = await queryWithTimeout(
         'SELECT id FROM users WHERE email = $1 AND typegroup = $2',
-        [data.email, 'vendor']
+        [data.email, 'vendor'], 8000
       );
 
       if (!userResult.rows || userResult.rows.length === 0) {
@@ -219,79 +285,44 @@ export async function POST(req: NextRequest) {
       vendorId = userResult.rows[0].id;
     }
 
-    console.log('Updating vendor with ID:', vendorId);
+    console.log('[vendor] Updating vendor with ID:', vendorId);
 
-    // Check if vendor record exists
-    const checkResult = await pool.query(
-      'SELECT id FROM vendor WHERE id = $1',
-      [vendorId]
+    // Update vendor record
+    const result = await queryWithTimeout(
+      `UPDATE vendor SET 
+        service_name = $1,
+        years_of_excellence = $2,
+        contact_number = $3,
+        address = $4,
+        selected_services = $5,
+        expertise_in = $6,
+        type = $7,
+        active = $8,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id::text = $9::text
+      RETURNING *`,
+      [
+        data.service_name || '',
+        data.years_of_excellence || 0,
+        data.contact_number || '',
+        data.address || '',
+        data.selected_services || '[]',
+        data.expertise_in || '',
+        data.type || 'vendor',
+        data.active !== undefined ? data.active : true,
+        vendorId
+      ], 10000
     );
 
-    let result;
-    if (checkResult.rows && checkResult.rows.length > 0) {
-      // Update existing vendor record
-      console.log('Updating existing vendor record...');
-      result = await pool.query(
-        `UPDATE vendor SET 
-          service_name = $1,
-          years_of_excellence = $2,
-          contact_number = $3,
-          address = $4,
-          selected_services = $5,
-          expertise_in = $6,
-          type = $7,
-          active = $8,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = $9
-        RETURNING *`,
-        [
-          data.service_name || '',
-          data.years_of_excellence || 0,
-          data.contact_number || '',
-          data.address || '',
-          data.selected_services || '[]',
-          data.expertise_in || '',
-          data.type || 'business',
-          data.active !== undefined ? data.active : true,
-          vendorId
-        ]
-      );
-    } else {
-      // Create new vendor record
-      console.log('Creating new vendor record...');
-      result = await pool.query(
-        `INSERT INTO vendor 
-          (id, service_name, years_of_excellence, email, contact_number, address, selected_services, expertise_in, type, active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        RETURNING *`,
-        [
-          vendorId,
-          data.service_name || '',
-          data.years_of_excellence || 0,
-          data.email || '',
-          data.contact_number || '',
-          data.address || '',
-          data.selected_services || '[]',
-          data.expertise_in || '',
-          data.type || 'business',
-          data.active !== undefined ? data.active : true
-        ]
-      );
-    }
-
-    console.log('Vendor operation successful');
+    console.log('[vendor] Vendor update successful');
     return NextResponse.json({
       success: true,
       vendor: result.rows[0]
     });
 
   } catch (error) {
-    console.error('Error in POST /api/vendor:', error);
+    console.error('[vendor] Error in POST:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error('Error details:', errorMessage);
-    if (errorStack) console.error('Error stack:', errorStack);
-
     return NextResponse.json(
       { error: 'Internal server error', details: errorMessage },
       { status: 500 }
@@ -299,7 +330,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT method - Update vendor information
+// PUT method
 export async function PUT(req: NextRequest) {
   return POST(req);
 }

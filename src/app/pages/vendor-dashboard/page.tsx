@@ -153,6 +153,11 @@ const VendorDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
 
+  // Add this at the top with other state declarations
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [lastFetchTimestamp, setLastFetchTimestamp] = useState(0);
+  const FETCH_COOLDOWN = 5000; // 5 seconds cooldown between fetches
+
   // OAuth callback handler
   useEffect(() => {
     const handleOAuthCallback = () => {
@@ -190,17 +195,182 @@ const VendorDashboard: React.FC = () => {
       if (!dateTime) return 'Invalid date/time';
 
       const date = new Date(dateTime);
-
       if (isNaN(date.getTime())) return 'Invalid date/time';
 
-      return date.toLocaleString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: 'short' as const,
+        month: 'short' as const,
+        day: 'numeric' as const,
+        hour: '2-digit' as const,
+        minute: '2-digit' as const,
+        timeZone: 'Asia/Colombo'
+      };
+
+      return date.toLocaleString('en-US', options);
     } catch (error) {
+      return 'Invalid date/time';
+    }
+  };
+
+  // Helper function to format date only
+  const formatDateOnly = (dateTime: string) => {
+    try {
+      if (!dateTime) return 'Invalid date';
+
+      const date = new Date(dateTime);
+      if (isNaN(date.getTime())) return 'Invalid date';
+
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long' as const,
+        year: 'numeric' as const,
+        month: 'long' as const,
+        day: 'numeric' as const,
+        timeZone: 'Asia/Colombo'
+      };
+
+      return date.toLocaleDateString('en-US', options);
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
+  // Helper function to format time only
+  const formatTimeOnly = (dateTime: string) => {
+    try {
+      if (!dateTime) return 'Invalid time';
+
+      const date = new Date(dateTime);
+      if (isNaN(date.getTime())) return 'Invalid time';
+
+      const options: Intl.DateTimeFormatOptions = {
+        hour: '2-digit' as const,
+        minute: '2-digit' as const,
+        hour12: true,
+        timeZone: 'Asia/Colombo'
+      };
+
+      return date.toLocaleTimeString('en-US', options);
+    } catch (error) {
+      return 'Invalid time';
+    }
+  };
+
+  // Helper function to format time range
+  const formatTimeRange = (start: string, end: string) => {
+    if (!start) return '';
+
+    try {
+      const startDate = new Date(start);
+      const endDate = end ? new Date(end) : null;
+
+      if (isNaN(startDate.getTime())) return '';
+
+      const timeOptions: Intl.DateTimeFormatOptions = {
+        hour: '2-digit' as const,
+        minute: '2-digit' as const,
+        hour12: true,
+        timeZone: 'Asia/Colombo'
+      };
+
+      const startStr = startDate.toLocaleTimeString('en-US', timeOptions);
+      const endStr = endDate && !isNaN(endDate.getTime())
+        ? endDate.toLocaleTimeString('en-US', timeOptions)
+        : '';
+
+      return endStr ? `${startStr} - ${endStr}` : startStr;
+    } catch (error) {
+      console.error('Error formatting time range:', error);
+      return 'Invalid time';
+    }
+  };
+
+  // Helper function to safely create a Date object
+  const safeCreateDate = (dateString: string): Date => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return new Date(); // Return current date as fallback
+    }
+    return date;
+  };
+
+  const getCurrentSriLankaDateDisplay = () => {
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: 'Asia/Colombo',
+      weekday: 'long' as const,
+      year: 'numeric' as const,
+      month: 'long' as const,
+      day: 'numeric' as const
+    };
+
+    return new Date().toLocaleDateString('en-US', options);
+  };
+
+  const convertToSriLankaTime = (date: string, time: string) => {
+    try {
+      const [year, month, day] = date.split('-').map(Number);
+      const [hours, minutes] = time.split(':').map(Number);
+
+      // Create the datetime in local browser timezone first
+      const localDateTime = new Date(year, month - 1, day, hours, minutes);
+
+      // Convert to Sri Lanka timezone for submission
+      const sriLankaDateOptions: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Colombo'
+      };
+
+      const sriLankaTimeOptions: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Colombo',
+        hour12: false,
+        hour: '2-digit' as const,
+        minute: '2-digit' as const
+      };
+
+      const sriLankaDate = localDateTime.toLocaleDateString('en-CA', sriLankaDateOptions);
+      const sriLankaTime = localDateTime.toLocaleTimeString('en-US', sriLankaTimeOptions);
+
+      return {
+        date: sriLankaDate,
+        time: sriLankaTime
+      };
+    } catch (error) {
+      console.error('Error converting to Sri Lanka time:', error);
+      return { date, time }; // Return original values if conversion fails
+    }
+  };
+
+  const formatDateTimeForSessions = (dateString: string, timeString?: string) => {
+    try {
+      if (!dateString) return 'Invalid date/time';
+
+      let dateTime: Date;
+
+      // If it's already a full datetime string
+      if (dateString.includes('T') || dateString.includes(' ')) {
+        dateTime = new Date(dateString);
+      } else {
+        // If it's just a date, optionally combine with time
+        if (timeString) {
+          dateTime = new Date(`${dateString}T${timeString}`);
+        } else {
+          dateTime = new Date(dateString);
+        }
+      }
+
+      if (isNaN(dateTime.getTime())) return 'Invalid date/time';
+
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: 'short' as const,
+        month: 'short' as const,
+        day: 'numeric' as const,
+        year: 'numeric' as const,
+        hour: '2-digit' as const,
+        minute: '2-digit' as const,
+        timeZone: 'Asia/Colombo'
+      };
+
+      return dateTime.toLocaleString('en-US', options);
+    } catch (error) {
+      console.error('Error formatting date/time:', error);
       return 'Invalid date/time';
     }
   };
@@ -215,60 +385,44 @@ const VendorDashboard: React.FC = () => {
     const [feedback, setFeedback] = useState<FeedbackState>({ type: '', message: '' });
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage] = useState(10);
-    const [lastFetchTime, setLastFetchTime] = useState(0);
     const [isDeleting, setIsDeleting] = useState(false);
-
-    // Feedback timeout to automatically clear feedback messages
-    useEffect(() => {
-      if (feedback.message) {
-        const timer = setTimeout(() => {
-          setFeedback({ type: '', message: '' });
-        }, 3000); // Clear feedback after 3 seconds
-
-        return () => clearTimeout(timer);
-      }
-    }, [feedback]);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Load existing availabilities - with throttling to prevent excessive calls
     useEffect(() => {
-      if (vendorId && !isLoading && !isDeleting) {
-        // Prevent excessive API calls by checking if we've fetched recently
-        const now = Date.now();
-        if (now - lastFetchTime > 5000) { // Only fetch if it's been more than 5 seconds
-          fetchAvailabilities();
-          setLastFetchTime(now);
-        }
+      // Only fetch on initial mount or when vendorId changes
+      if (vendorId && isInitialLoad && !isLoading && !isDeleting) {
+        console.log('[availability] Initial fetch for vendorId:', vendorId);
+        fetchAvailabilities();
+        setIsInitialLoad(false);
       }
-    }, [vendorId, isLoading, isDeleting, lastFetchTime]);
+    }, [vendorId, isInitialLoad, isLoading, isDeleting]);
 
     const fetchAvailabilities = async () => {
+      const now = Date.now();
+      if (isLoading || (now - lastFetchTimestamp < FETCH_COOLDOWN)) {
+        console.log('[fetchAvailabilities] Skipping fetch - loading or in cooldown');
+        return;
+      }
+
+      setIsLoading(true);
+      setLastFetchTimestamp(now);
+
       try {
-        // Using encodeURIComponent to safely handle special characters in vendorId
         const encodedVendorId = encodeURIComponent(String(vendorId));
+        console.log('[fetchAvailabilities] Fetching for vendorId:', encodedVendorId);
 
         const response = await fetch(`/api/vendor-availability?vendorId=${encodedVendorId}`);
 
         if (response.ok) {
           const data = await response.json();
-
           if (data && Array.isArray(data)) {
-            // Process the data to ensure date fields are properly formatted
-            const processedData = data.map(slot => {
-              try {
-                // Create new objects with ensured date formatting
-                return {
-                  ...slot,
-                  // Ensure date fields are properly parsed
-                  start_time: new Date(slot.start_time).toISOString(),
-                  end_time: new Date(slot.end_time).toISOString(),
-                  is_booked: slot.is_booked || false
-                };
-              } catch (error) {
-                // Return the original slot if there's an error
-                return slot;
-              }
-            }).filter(slot => {
-              // Filter out any slots with invalid dates
+            const processedData = data.map(slot => ({
+              ...slot,
+              start_time: new Date(slot.start_time).toISOString(),
+              end_time: new Date(slot.end_time).toISOString(),
+              is_booked: slot.is_booked || false
+            })).filter(slot => {
               try {
                 return !isNaN(new Date(slot.start_time).getTime()) &&
                   !isNaN(new Date(slot.end_time).getTime());
@@ -277,14 +431,11 @@ const VendorDashboard: React.FC = () => {
               }
             });
 
-            // Sort slots by start time
             processedData.sort((a, b) =>
               new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
             );
 
             setAvailabilities(processedData);
-
-            // Set current page to 1 when data changes
             setCurrentPage(1);
           } else {
             setAvailabilities([]);
@@ -293,7 +444,10 @@ const VendorDashboard: React.FC = () => {
           setAvailabilities([]);
         }
       } catch (error) {
+        console.error('[fetchAvailabilities] Error:', error);
         setAvailabilities([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -321,18 +475,46 @@ const VendorDashboard: React.FC = () => {
       setTimeSlots(timeSlots.filter(slot => slot !== time));
     };
 
-    // Save availability
-    const saveAvailability = async () => {
-      if (timeSlots.length === 0) {
-        setFeedback({ type: 'error', message: 'Please select at least one time slot' });
-        return;
+    // In your vendor dashboard, add this to prevent multiple calls:
+    const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+    useEffect(() => {
+      if (auth.isAuthenticated && auth.vendorId && !isDataLoaded) {
+        loadVendorData();
+        setIsDataLoaded(true);
       }
+    }, [auth.isAuthenticated, auth.vendorId, isDataLoaded]);
+
+    // Save availability
+
+    const saveAvailability = async () => {
+      if (isLoading) return; // Prevent concurrent calls
 
       setIsLoading(true);
       try {
-        console.log('Starting saveAvailability with vendorId:', vendorId, 'type:', typeof vendorId); // Debug
+        console.log('Starting saveAvailability with vendorId:', vendorId);
 
-        // Convert time slots to full datetime
+        // CRITICAL FIX: Resolve email to numeric vendor ID if needed
+        let actualVendorId = vendorId;
+
+        if (typeof vendorId === 'string' && vendorId.includes('@')) {
+          console.log('Resolving email to numeric vendor ID...');
+
+          try {
+            const response = await fetch(`/api/vendor?vendorId=${encodeURIComponent(vendorId)}`);
+            if (response.ok) {
+              const vendorData = await response.json();
+              if (vendorData && vendorData.id) {
+                actualVendorId = vendorData.id;
+                console.log('Resolved email to vendor ID:', actualVendorId);
+              }
+            }
+          } catch (resolveError) {
+            console.error('Failed to resolve email to vendor ID:', resolveError);
+            // Continue with original vendorId as fallback
+          }
+        }
+
         const availabilitySlots = timeSlots.map(time => {
           const [hours, minutes] = time.split(':').map(Number);
           const startTime = new Date(selectedDate);
@@ -347,22 +529,17 @@ const VendorDashboard: React.FC = () => {
           };
         });
 
-        console.log('Generated availability slots:', availabilitySlots); // Debug
-
-        // Send each slot individually (API expects one slot per request)
         let successCount = 0;
         const totalSlots = availabilitySlots.length;
 
-        console.log('About to send slots. VendorId type:', typeof vendorId, 'Value:', vendorId); // Debug
-
         for (const slot of availabilitySlots) {
           const requestData = {
-            vendor_id: String(vendorId), // Changed from vendorId to vendor_id
+            vendor_id: actualVendorId, // Use the resolved numeric ID
             start_time: slot.startTime,
             end_time: slot.endTime
           };
 
-          console.log('Sending individual slot:', JSON.stringify(requestData, null, 2)); // Debug log
+          console.log('Sending availability slot data:', requestData);
 
           const response = await fetch('/api/vendor-availability', {
             method: 'POST',
@@ -370,20 +547,13 @@ const VendorDashboard: React.FC = () => {
             body: JSON.stringify(requestData)
           });
 
-          console.log('Response status:', response.status); // Debug
-          console.log('Response headers:', Object.fromEntries(response.headers.entries())); // Debug
-
           if (!response.ok) {
             let error;
             try {
               error = await response.json();
             } catch (parseError) {
-              console.error('Failed to parse error response:', parseError);
               error = { error: `HTTP ${response.status} ${response.statusText}` };
             }
-            console.error('API Error for slot:', error); // Debug log
-
-            // Check if we got a meaningful error message
             const errorMessage = error?.error || error?.message || `Failed to save availability slot ${successCount + 1}/${totalSlots}`;
             throw new Error(errorMessage);
           }
@@ -391,14 +561,13 @@ const VendorDashboard: React.FC = () => {
           successCount++;
         }
 
-        console.log(`Successfully saved ${successCount}/${totalSlots} slots`); // Debug log
-
         setFeedback({ type: 'success', message: `Successfully saved ${successCount} availability slots!` });
         setTimeSlots([]);
-        // Force refresh of availability data
-        const now = Date.now();
-        setLastFetchTime(now - 6000);
-        await fetchAvailabilities();
+
+        // Refresh data after successful save
+        setTimeout(() => {
+          fetchAvailabilities();
+        }, 500);
 
       } catch (error) {
         console.error('Error saving availability:', error);
@@ -408,37 +577,30 @@ const VendorDashboard: React.FC = () => {
         setIsLoading(false);
       }
     };
+
     // Delete availability with fixed handling
     const deleteAvailability = async (slotId: string) => {
-      if (isDeleting) return; // Prevent concurrent deletion requests
+      if (isDeleting) return; // Prevent concurrent deletions
 
       setIsDeleting(true);
       try {
-        // Convert vendorId to string to ensure proper encoding
-        const encodedVendorId = encodeURIComponent(String(vendorId));
-        const encodedSlotId = encodeURIComponent(slotId);
-
-        const response = await fetch(`/api/vendor-availability?slotId=${encodedSlotId}&vendorId=${encodedVendorId}`, {
+        const response = await fetch(`/api/vendor-availability/${slotId}`, {
           method: 'DELETE'
         });
 
-        if (response.ok) {
-          setFeedback({ type: 'success', message: 'Availability slot removed' });
-          // Update the availability list directly without refetching
-          setAvailabilities(current => current.filter(slot => slot.id !== slotId));
-        } else {
-          const error = await response.json();
-          setFeedback({ type: 'error', message: error.error || 'Failed to delete slot' });
+        if (!response.ok) {
+          throw new Error('Failed to delete availability slot');
         }
+
+        setFeedback({ type: 'success', message: 'Availability slot deleted successfully' });
+
+        // Refresh the availabilities list
+        await fetchAvailabilities();
       } catch (error) {
-        setFeedback({ type: 'error', message: 'Failed to remove availability' });
+        console.error('Error deleting availability:', error);
+        setFeedback({ type: 'error', message: 'Failed to delete availability slot' });
       } finally {
         setIsDeleting(false);
-        // Force data refresh
-        setTimeout(() => {
-          const now = Date.now();
-          setLastFetchTime(now - 6000);
-        }, 300);
       }
     };
 
@@ -448,7 +610,8 @@ const VendorDashboard: React.FC = () => {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
-          day: 'numeric'
+          day: 'numeric',
+          timeZone: 'Asia/Colombo'
         });
       } catch (error) {
         return 'Invalid date';
@@ -467,7 +630,8 @@ const VendorDashboard: React.FC = () => {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
-          day: 'numeric'
+          day: 'numeric',
+          timeZone: 'Asia/Colombo'
         });
       } catch (error) {
         return 'Invalid date';
@@ -485,7 +649,8 @@ const VendorDashboard: React.FC = () => {
         return date.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
+          timeZone: 'Asia/Colombo'
         });
       } catch (error) {
         return 'Invalid time';
@@ -576,11 +741,6 @@ const VendorDashboard: React.FC = () => {
         setFeedback({ type: 'error', message: 'Failed to clear all slots' });
       } finally {
         setIsDeleting(false);
-        // Force data refresh
-        setTimeout(() => {
-          const now = Date.now();
-          setLastFetchTime(now - 6000);
-        }, 300);
       }
     };
 
@@ -643,11 +803,11 @@ const VendorDashboard: React.FC = () => {
               <input
                 type="date"
                 value={selectedDate.toISOString().split('T')[0]}
-                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                onChange={(e) => setSelectedDate(safeCreateDate(e.target.value + 'T00:00:00'))}
                 min={new Date().toISOString().split('T')[0]}
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg text-black font-medium focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent"
               />
-              <p className="text-sm text-gray-600 mt-1">{formatDate(selectedDate)}</p>
+              <p className="text-sm text-gray-600 mt-1">{formatDateOnly(selectedDate.toISOString())}</p>
             </div>
 
             {/* Time Slots */}
@@ -931,15 +1091,24 @@ const VendorDashboard: React.FC = () => {
 
   // Load data after authentication
   useEffect(() => {
-    if (auth.isAuthenticated && auth.vendorId) {
-      console.log('Auth state when loading data:', auth); // Debug log
+    if (auth.isAuthenticated && auth.vendorId && !isLoadingData) {
+      console.log('[useEffect] Triggering data load');
       loadVendorData();
     }
   }, [auth.isAuthenticated, auth.vendorId]);
 
   const loadVendorData = async () => {
-    setDataLoaded(false);
+    const now = Date.now();
+    if (isLoadingData || (now - lastFetchTimestamp < FETCH_COOLDOWN)) {
+      console.log('[loadVendorData] Skipping fetch - loading or in cooldown');
+      return;
+    }
+
+    setIsLoadingData(true);
+    setLastFetchTimestamp(now);
+
     try {
+      console.log('[loadVendorData] Starting data fetch');
       await Promise.all([
         fetchVendorInfo(),
         fetchVendorProfile()
@@ -948,7 +1117,8 @@ const VendorDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error loading data:', error);
       setFeedback({ type: 'error', message: 'Failed to load vendor data. Please try again.' });
-      setDataLoaded(true); // Set to true even on error to prevent infinite loading
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1032,10 +1202,13 @@ const VendorDashboard: React.FC = () => {
     try {
       // FIX: Use the correct profile API endpoint
       const encodedVendorId = encodeURIComponent(String(auth.vendorId));
+      console.log('Fetching vendor profile for ID:', encodedVendorId);
+
       const response = await fetch(`/api/vendor-profile?vendorId=${encodedVendorId}`);
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Received vendor profile data:', data);
 
         // Validate the received data
         if (!data || typeof data !== 'object') {
@@ -1064,30 +1237,40 @@ const VendorDashboard: React.FC = () => {
 
         setVendorProfile(validatedProfile);
         setEditableProfile(validatedProfile);
-      } else if (response.status === 404) {
-        // Profile doesn't exist, create default
-        const defaultProfile: VendorProfile = {
-          id: '',
-          vendor_id: auth.vendorId,
-          website_url: '',
-          portfolio_documents: '[]',
-          years_in_business: 0,
-          business_registration_number: '',
-          tax_identification_number: '',
-          social_media_links: '{}',
-          certifications: '[]',
-          profile_completion_percentage: 0,
-          verification_status: 'pending' as const,
-          verification_notes: '',
-          reviewed_by: null,
-          reviewed_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setVendorProfile(defaultProfile);
-        setEditableProfile(defaultProfile);
       } else {
-        throw new Error(`Failed to fetch vendor profile: ${response.status}`);
+        // Handle non-OK response
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error response from server:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+
+        if (response.status === 404) {
+          // Profile doesn't exist, create default
+          const defaultProfile: VendorProfile = {
+            id: '',
+            vendor_id: auth.vendorId,
+            website_url: '',
+            portfolio_documents: '[]',
+            years_in_business: 0,
+            business_registration_number: '',
+            tax_identification_number: '',
+            social_media_links: '{}',
+            certifications: '[]',
+            profile_completion_percentage: 0,
+            verification_status: 'pending' as const,
+            verification_notes: '',
+            reviewed_by: null,
+            reviewed_at: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          setVendorProfile(defaultProfile);
+          setEditableProfile(defaultProfile);
+        } else {
+          throw new Error(`Failed to fetch vendor profile: ${response.status} ${response.statusText}`);
+        }
       }
     } catch (error) {
       console.error('Error fetching vendor profile:', error);
@@ -1477,17 +1660,6 @@ const VendorDashboard: React.FC = () => {
     }
   };
 
-  // Add a helper to format time
-  const formatTimeRange = (start: string, end: string) => {
-    if (!start) return '';
-    const startDate = new Date(start);
-    const endDate = end ? new Date(end) : null;
-    if (isNaN(startDate.getTime())) return '';
-    const startStr = startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const endStr = endDate && !isNaN(endDate.getTime()) ? endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
-    return endStr ? `${startStr} - ${endStr}` : startStr;
-  };
-
   // Check if we should render the page at all
   if (!auth.isAuthenticated || (usergroup && usergroup !== 'vendor')) {
     // Show loading instead of content while redirecting
@@ -1506,7 +1678,7 @@ const VendorDashboard: React.FC = () => {
     );
   }
 
-  if (!dataLoaded) {
+  if (!dataLoaded || isSubmitting) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
@@ -2057,7 +2229,7 @@ const VendorDashboard: React.FC = () => {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-gray-900">{formatDate(session.request_date)}</div>
+                                  <div className="text-sm text-gray-900">{formatDateOnly(session.request_date)}</div>
                                   {session.start_time && (
                                     <div className="text-xs text-gray-600">{formatTimeRange(session.start_time, session.end_time)}</div>
                                   )}

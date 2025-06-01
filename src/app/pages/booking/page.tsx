@@ -1,3 +1,9 @@
+// Fixed booking page with proper data loading
+// The main issues were:
+// 1. useEffect not calling the fetch functions
+// 2. Missing isMounted usage
+// 3. API calls not being triggered properly
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -52,6 +58,60 @@ export default function BookingPage() {
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
+  // CRITICAL FIX: Add this useEffect to trigger data loading when component mounts
+  useEffect(() => {
+    setIsMounted(true);
+
+    // Load user data from localStorage
+    if (typeof window !== "undefined") {
+      const storedEmail = localStorage.getItem("email");
+      const storedName = localStorage.getItem("username");
+      const storedGroup = localStorage.getItem("typegroup");
+
+      console.log("[booking] Loaded from localStorage:", { storedEmail, storedName, storedGroup });
+
+      setEmail(storedEmail);
+      setName(storedName);
+      setGroup(storedGroup);
+    }
+
+    // Always fetch data regardless of user type for initial load
+    console.log("[booking] Component mounted, starting data fetch...");
+    fetchData();
+  }, []);
+
+  // CRITICAL FIX: Create a single function to fetch all data
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log("[booking] Starting parallel data fetch...");
+
+      // Fetch both consultants and services in parallel
+      const [consultantsResult, servicesResult] = await Promise.allSettled([
+        fetchConsultants(),
+        fetchServices()
+      ]);
+
+      // Log results
+      if (consultantsResult.status === "rejected") {
+        console.error("[booking] Consultants fetch failed:", consultantsResult.reason);
+      }
+
+      if (servicesResult.status === "rejected") {
+        console.error("[booking] Services fetch failed:", servicesResult.reason);
+      }
+
+    } catch (error) {
+      console.error("[booking] Critical error in fetchData:", error);
+      setError("Failed to load data. Please refresh the page.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update form data when email/name changes
   useEffect(() => {
     if (email) {
       setFormData(prev => ({ ...prev, email }));
@@ -59,18 +119,9 @@ export default function BookingPage() {
     if (name) {
       setFormData(prev => ({ ...prev, name }));
     }
-  }, [email]);
+  }, [email, name]);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setEmail(localStorage.getItem("email"));
-      setName(localStorage.getItem("username"));
-      setGroup(localStorage.getItem("typegroup"));
-    }
-  }, []);
-
-  const [selectedResource, setSelectedResource] =
-    useState<BookableResource | null>(null);
+  const [selectedResource, setSelectedResource] = useState<BookableResource | null>(null);
 
   useEffect(() => {
     if (selectedResource?.name) {
@@ -180,95 +231,85 @@ export default function BookingPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchConsultants = async () => {
-      try {
-        const response = await fetch("/api/getConsultants", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+  // CRITICAL FIX: Make fetchConsultants return a Promise and don't set loading state here
+  const fetchConsultants = async (): Promise<void> => {
+    try {
+      console.log("[booking] Fetching consultants from /api/getConsultants");
+      const response = await fetch("/api/getConsultants");
 
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
-        }
+      console.log("[booking] Consultants response status:", response.status);
 
-        const data = await response.json();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[booking] Consultants API error response:", errorText);
+        throw new Error(`Consultants API Error ${response.status}: ${errorText}`);
+      }
 
-        const consultantsWithImages = data.map((consultant: Consultant) => ({
-          ...consultant,
-          image: "/images/face.jpg",
+      const data = await response.json();
+      console.log("[booking] Consultants data received:", data);
+
+      if (!Array.isArray(data)) {
+        console.error("[booking] Invalid consultants data format:", data);
+        throw new Error("Invalid consultants data format");
+      }
+
+      const consultantsWithImages = data.map((consultant: Consultant) => ({
+        ...consultant,
+        image: "/images/face.jpg",
+      }));
+
+      console.log(`[booking] Setting ${consultantsWithImages.length} consultants`);
+      setConsultants(consultantsWithImages);
+    } catch (err) {
+      console.error("[booking] Error fetching consultants:", err);
+      // Don't set error here, let the parent handle it
+      throw err;
+    }
+  };
+
+  // CRITICAL FIX: Make fetchServices return a Promise and don't set loading state here
+  const fetchServices = async (): Promise<void> => {
+    try {
+      console.log("[booking] Fetching services from /api/getServices");
+
+      const response = await fetch("/api/getServices");
+
+      console.log("[booking] Services response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[booking] Services API error response:", errorText);
+        throw new Error(`Services API Error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log("[booking] Services data received:", data);
+
+      if (!data || !Array.isArray(data)) {
+        console.error("[booking] Invalid data format from services API", data);
+        throw new Error("Invalid data from services API");
+      }
+
+      if (data.length === 0) {
+        console.log("[booking] No services returned from API, setting empty array");
+        setServices([]);
+      } else {
+        console.log(`[booking] Processing ${data.length} services`);
+
+        const servicesWithImages = data.map((service: Service) => ({
+          ...service,
+          image: "/images/Service.jpg",
         }));
 
-        setConsultants(consultantsWithImages);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch consultants"
-        );
-        console.error("Error fetching consultants:", err);
-      } finally {
-        setLoading(false);
+        console.log("[booking] Setting services with images");
+        setServices(servicesWithImages);
       }
-    };
-
-    fetchConsultants();
-  }, []);
-
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        console.log("[booking] Fetching services...");
-        setLoading(true);
-
-        const response = await fetch("/api/getServices", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("[booking] Services API response:", data);
-
-        if (!data || !Array.isArray(data)) {
-          console.error("[booking] Invalid data format from services API", data);
-          throw new Error("Invalid data from services API");
-        }
-
-        // Check if we got any services
-        if (data.length === 0) {
-          console.log("[booking] No services returned from API, setting empty array");
-          setServices([]);
-        } else {
-          console.log(`[booking] Processing ${data.length} services`);
-
-          const servicesWithImages = data.map((service: Service) => ({
-            ...service,
-            image: "/images/Service.jpg",
-          }));
-
-          console.log("[booking] Setting services with images");
-          setServices(servicesWithImages);
-        }
-      } catch (err) {
-        console.error("[booking] Error fetching services:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch services"
-        );
-        // Set empty array to prevent UI from breaking
-        setServices([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchServices();
-  }, []);
+    } catch (err) {
+      console.error("[booking] Error fetching services:", err);
+      // Don't set error here, let the parent handle it
+      throw err;
+    }
+  };
 
   const [status, setStatus] = useState<string>("");
 
@@ -286,42 +327,63 @@ export default function BookingPage() {
     setFormData(prev => ({ ...prev, date: "" }));
   };
 
+  // Helper function to get current Sri Lanka date
   const getSriLankaDate = () => {
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: 'Asia/Colombo'
+    };
+
     const now = new Date();
-    // Convert to Sri Lanka timezone (UTC+5:30)
-    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Colombo' }));
+    return now.toLocaleDateString('en-CA', options); // Returns YYYY-MM-DD format
   };
 
-  const formatDateForInput = (date: Date) => {
-    return date.toLocaleString('en-US', {
-      timeZone: 'Asia/Colombo',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).split(',')[0].replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2');
-  };
-
+  // Update useEffect for minDate
   useEffect(() => {
-    const today = getSriLankaDate();
-    setMinDate(formatDateForInput(today));
+    setMinDate(getSriLankaDate());
   }, []);
 
+  // Update handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("Submitting...");
 
     try {
+      let submissionData = { ...formData };
+
       // If using preferred date/time (no slot selected)
       if (!selectedSlot && formData.date && formData.preferred_time) {
-        // Convert the date and time to ISO string in Sri Lanka timezone
+        console.log('[booking] Processing preferred time booking');
+        console.log('[booking] Original data:', { date: formData.date, time: formData.preferred_time });
+
+        // Create a date object from the form inputs
         const [year, month, day] = formData.date.split('-').map(Number);
         const [hours, minutes] = formData.preferred_time.split(':').map(Number);
 
-        const bookingDateTime = new Date(year, month - 1, day, hours, minutes);
-        const sriLankaDateTime = new Date(bookingDateTime.toLocaleString('en-US', { timeZone: 'Asia/Colombo' }));
+        // Create the datetime in local browser timezone first
+        const localDateTime = new Date(year, month - 1, day, hours, minutes);
 
-        // Update formData with the timezone-adjusted date
-        formData.date = sriLankaDateTime.toISOString().split('T')[0];
+        // Convert to Sri Lanka timezone for submission
+        const sriLankaDateOptions: Intl.DateTimeFormatOptions = {
+          timeZone: 'Asia/Colombo'
+        };
+
+        const sriLankaTimeOptions: Intl.DateTimeFormatOptions = {
+          timeZone: 'Asia/Colombo',
+          hour12: false,
+          hour: '2-digit' as const,
+          minute: '2-digit' as const
+        };
+
+        const sriLankaDate = localDateTime.toLocaleDateString('en-CA', sriLankaDateOptions);
+        const sriLankaTime = localDateTime.toLocaleTimeString('en-US', sriLankaTimeOptions);
+
+        submissionData.date = sriLankaDate;
+        submissionData.preferred_time = sriLankaTime;
+
+        console.log('[booking] Converted to Sri Lanka timezone:', {
+          original: { date: formData.date, time: formData.preferred_time },
+          converted: { date: sriLankaDate, time: sriLankaTime }
+        });
       }
 
       const response = await fetch("/api/postbooking", {
@@ -329,7 +391,7 @@ export default function BookingPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submissionData),
       });
 
       const data = await response.json();
@@ -399,13 +461,16 @@ export default function BookingPage() {
       if (isNaN(date.getTime())) {
         throw new Error('Invalid date');
       }
-      return date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
+
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long' as const,
+        year: 'numeric' as const,
+        month: 'long' as const,
+        day: 'numeric' as const,
         timeZone: 'Asia/Colombo'
-      });
+      };
+
+      return date.toLocaleDateString('en-US', options);
     } catch (error) {
       console.error('[booking] Error formatting date:', error);
       return 'Invalid date';
@@ -419,12 +484,15 @@ export default function BookingPage() {
       if (isNaN(date.getTime())) {
         throw new Error('Invalid time');
       }
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
+
+      const options: Intl.DateTimeFormatOptions = {
+        hour: '2-digit' as const,
+        minute: '2-digit' as const,
         hour12: true,
         timeZone: 'Asia/Colombo'
-      });
+      };
+
+      return date.toLocaleTimeString('en-US', options);
     } catch (error) {
       console.error('[booking] Error formatting time:', error);
       return 'Invalid time';
@@ -465,6 +533,15 @@ export default function BookingPage() {
   const isService = (resource: BookableResource): resource is Service => {
     return resource.type === "Services";
   };
+
+  // Don't render until mounted to avoid hydration issues
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-xl text-[#1E3A8A]">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="font-sans bg-gray-50">
@@ -509,75 +586,89 @@ export default function BookingPage() {
       </motion.section>
 
 
-      {typegroup === "client" && (
-        <section
-          id="consultants"
-          className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+
+      {/* Show sections for all users initially, then filter by typegroup */}
+      <section
+        id="consultants"
+        className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+      >
+        <motion.h2
+          className="text-4xl font-bold text-[#1E3A8A] mb-16 text-center"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
         >
-          <motion.h2
-            className="text-4xl font-bold text-[#1E3A8A] mb-16 text-center"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            Meet Your Growth Partners
-          </motion.h2>
+          Meet Your Growth Partners
+        </motion.h2>
 
-          {loading ? (
-            <div className="text-center py-20">
-              <div className="text-xl text-[#1E3A8A]">Loading consultants...</div>
+        {loading ? (
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#1E3A8A] border-t-transparent mx-auto mb-4"></div>
+            <div className="text-xl text-[#1E3A8A]">Loading consultants...</div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-20">
+            <div className="text-xl text-red-500 mb-4">
+              Failed to load consultants. Please try again later.
             </div>
-          ) : error ? (
-            <div className="text-center py-20">
-              <div className="text-xl text-red-500">
-                Failed to load consultants. Please try again later.
-              </div>
-            </div>
-          ) : (
-            ["finance", "legal", "business"].map((type, index) => {
-              const filteredConsultants = consultants.filter(
-                (c) => c.type === type
-              );
+            <div className="text-sm text-gray-500">{error}</div>
+            <button
+              onClick={fetchData}
+              className="mt-4 px-4 py-2 bg-[#10B981] text-white rounded-full hover:bg-[#059669]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : consultants.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-xl text-[#1E3A8A]">No consultants available at this time.</div>
+          </div>
+        ) : (
+          ["finance", "legal", "business"].map((type, index) => {
+            const filteredConsultants = consultants.filter(
+              (c) => c.type === type
+            );
 
-              if (filteredConsultants.length === 0) return null;
+            if (filteredConsultants.length === 0) return null;
 
-              return (
-                <motion.div
-                  key={type}
-                  className="mb-16"
-                  initial={{ opacity: 0, y: 50 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.2 }}
-                >
-                  <h3 className="text-3xl font-semibold text-[#1E3A8A] mb-8 capitalize">
-                    {type} Expertise
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {filteredConsultants.map((consultant) => (
-                      <motion.div
-                        key={consultant.id}
-                        className="bg-white p-6 rounded-xl shadow-md border border-gray-200"
-                        whileHover={{
-                          scale: 1.05,
-                          boxShadow: "0 8px 25px rgba(30, 58, 138, 0.15)",
-                        }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <Image
-                          src={consultant.image || "/images/face.jpg"}
-                          alt={consultant.name}
-                          width={150}
-                          height={150}
-                          className="rounded-full mx-auto mb-6 border-4 border-[#10B981]/20"
-                        />
-                        <h4 className="text-xl font-semibold text-[#1E3A8A]">
-                          {consultant.name}
-                        </h4>
-                        <p className="text-gray-600 mb-6">
-                          {consultant.description}
-                        </p>
+            return (
+              <motion.div
+                key={type}
+                className="mb-16"
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.2 }}
+              >
+                <h3 className="text-3xl font-semibold text-[#1E3A8A] mb-8 capitalize">
+                  {type} Expertise
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {filteredConsultants.map((consultant) => (
+                    <motion.div
+                      key={consultant.id}
+                      className="bg-white p-6 rounded-xl shadow-md border border-gray-200"
+                      whileHover={{
+                        scale: 1.05,
+                        boxShadow: "0 8px 25px rgba(30, 58, 138, 0.15)",
+                      }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Image
+                        src={consultant.image || "/images/face.jpg"}
+                        alt={consultant.name}
+                        width={150}
+                        height={150}
+                        className="rounded-full mx-auto mb-6 border-4 border-[#10B981]/20"
+                      />
+                      <h4 className="text-xl font-semibold text-[#1E3A8A]">
+                        {consultant.name}
+                      </h4>
+                      <p className="text-gray-600 mb-6">
+                        {consultant.description}
+                      </p>
+                      {(typegroup === "client" || !typegroup) && (
                         <motion.button
                           onClick={() => scrollToForm(consultant)}
                           className="w-full bg-[#10B981] text-white px-4 py-3 rounded-full font-medium"
@@ -587,105 +678,112 @@ export default function BookingPage() {
                         >
                           Schedule Now
                         </motion.button>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-              );
-            })
-          )}
-        </section>
-      )}
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </section>
 
-      {typegroup === "client" && (
-        <section
-          id="services"
-          className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+      <section
+        id="services"
+        className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+      >
+        <motion.h2
+          className="text-4xl font-bold text-[#1E3A8A] mb-16 text-center"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
         >
-          <motion.h2
-            className="text-4xl font-bold text-[#1E3A8A] mb-16 text-center"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+          Our Services
+        </motion.h2>
+
+        {loading ? (
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#1E3A8A] border-t-transparent mx-auto mb-4"></div>
+            <div className="text-xl text-[#1E3A8A]">Loading services...</div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-20">
+            <div className="text-xl text-red-500 mb-4">
+              Failed to load services. Please try again later.
+            </div>
+            <div className="text-sm text-gray-500">{error}</div>
+            <button
+              onClick={fetchData}
+              className="mt-4 px-4 py-2 bg-[#10B981] text-white rounded-full hover:bg-[#059669]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : services.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-xl text-[#1E3A8A]">No services available at this time.</div>
+            <div className="mt-4">
+              <button
+                onClick={fetchData}
+                className="px-4 py-2 bg-[#10B981] text-white rounded-full"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        ) : (
+          <motion.div
+            className="mb-16"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            Our Services
-          </motion.h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {services.map((service) => {
+                // Parse service list
+                const serviceList = parseServiceList(service.selectedservice);
 
-          {loading ? (
-            <div className="text-center py-20">
-              <div className="text-xl text-[#1E3A8A]">Loading services...</div>
-            </div>
-          ) : error ? (
-            <div className="text-center py-20">
-              <div className="text-xl text-red-500">
-                Failed to load services. Please try again later.
-              </div>
-              <div className="text-sm mt-4 text-gray-500">{error}</div>
-            </div>
-          ) : services.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="text-xl text-[#1E3A8A]">No services available at this time.</div>
-              <div className="mt-4">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-4 py-2 bg-[#10B981] text-white rounded-full"
-                >
-                  Refresh Page
-                </button>
-              </div>
-            </div>
-          ) : (
-            <motion.div
-              className="mb-16"
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {services.map((service) => {
-                  // Parse service list
-                  const serviceList = parseServiceList(service.selectedservice);
+                return (
+                  <motion.div
+                    key={service.id}
+                    className="bg-white p-6 rounded-xl shadow-md border border-gray-200"
+                    whileHover={{
+                      scale: 1.05,
+                      boxShadow: "0 8px 25px rgba(30, 58, 138, 0.15)",
+                    }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Image
+                      src={service.image || "/images/Service.jpg"}
+                      alt={service.name}
+                      width={150}
+                      height={150}
+                      className="rounded-full mx-auto mb-6 border-4 border-[#10B981]/20"
+                    />
+                    <h4 className="text-xl font-semibold text-[#1E3A8A] mb-2">
+                      {service.name}
+                    </h4>
+                    <span className="block text-gray-600 mb-4">
+                      Years Of Excellence: {service.years_of_excellence}
+                    </span>
+                    <div className="mb-6">
+                      <h5 className="font-medium text-gray-700 mb-2">
+                        Services Offered:
+                      </h5>
+                      <ul className="list-disc list-inside space-y-1 text-gray-600">
+                        {serviceList && serviceList.length > 0 ? (
+                          serviceList.map((item, index) => (
+                            <li key={index}>{item}</li>
+                          ))
+                        ) : (
+                          <li>General services</li>
+                        )}
+                      </ul>
+                    </div>
 
-                  return (
-                    <motion.div
-                      key={service.id}
-                      className="bg-white p-6 rounded-xl shadow-md border border-gray-200"
-                      whileHover={{
-                        scale: 1.05,
-                        boxShadow: "0 8px 25px rgba(30, 58, 138, 0.15)",
-                      }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <Image
-                        src={service.image || "/images/face.jpg"}
-                        alt={service.name}
-                        width={150}
-                        height={150}
-                        className="rounded-full mx-auto mb-6 border-4 border-[#10B981]/20"
-                      />
-                      <h4 className="text-xl font-semibold text-[#1E3A8A] mb-2">
-                        {service.name}
-                      </h4>
-                      <span className="block text-gray-600 mb-4">
-                        Year Of Excellence: {service.years_of_excellence}
-                      </span>
-                      <div className="mb-6">
-                        <h5 className="font-medium text-gray-700 mb-2">
-                          Services Offered:
-                        </h5>
-                        <ul className="list-disc list-inside space-y-1 text-gray-600">
-                          {serviceList && serviceList.length > 0 ? (
-                            serviceList.map((item, index) => (
-                              <li key={index}>{item}</li>
-                            ))
-                          ) : (
-                            <li>No services available</li>
-                          )}
-                        </ul>
-                      </div>
-
+                    {(typegroup === "client" || !typegroup) && (
                       <motion.button
                         onClick={() => scrollToForm(service)}
                         className="w-full bg-[#10B981] text-white px-4 py-3 rounded-full font-medium"
@@ -695,15 +793,16 @@ export default function BookingPage() {
                       >
                         Schedule Now
                       </motion.button>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </section>
-      )}
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </section>
 
+      {/* Booking Form Section */}
       {email && email.length > 0 ? (
         selectedResource && (
           <motion.section
@@ -935,4 +1034,3 @@ export default function BookingPage() {
     </div>
   );
 }
-

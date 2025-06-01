@@ -11,7 +11,7 @@ const getBaseUrl = () => {
     }
 
     // Production fallback
-    return 'https://venture-spark-7kgkeyj3n-zuhri-asroffs-projects.vercel.app';
+    return 'https://venture-spark.vercel.app';
 };
 
 export const config = {
