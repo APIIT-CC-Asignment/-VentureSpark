@@ -74,7 +74,7 @@ export default function LoginPage() {
         console.log("==================");
 
         // Check if user is a vendor based on typegroup
-        if (user.typegroup === 'vendor') {
+        if (user.typegroup.toLowerCase() === 'vendor') {
           console.log("Setting vendor auth with ID:", user.vendorId);
           const authData = {
             isAuthenticated: true,
@@ -88,12 +88,12 @@ export default function LoginPage() {
           console.log("Redirecting to vendor dashboard...");
           setTimeout(() => redirectTo("/pages/vendor-dashboard"), 100);
 
-        } else if (user.typegroup === 'client') {
+        } else if (user.typegroup.toLowerCase() === 'client') {
           // Redirect regular users to user profile page
           console.log("Redirecting to user profile...");
           redirectTo("/");
 
-        } else if (user.typegroup === 'admin') {
+        } else if (user.typegroup.toLowerCase() === 'admin') {
           console.log("Redirecting to admin dashboard...");
           redirectTo("/pages/admin");
 

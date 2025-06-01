@@ -1,7 +1,7 @@
 describe('Admin Bookings Management', () => {
   beforeEach(() => {
     // Set up authentication
-    cy.visit('http://localhost:3000/pages/admin', { failOnStatusCode: false });
+    cy.visit('http://https://venture-spark.vercel.app/pages/admin', { failOnStatusCode: false });
     cy.window().then((win) => {
       win.localStorage.setItem('token', 'test-mock-token');
       win.localStorage.setItem('email', 'admin@gmail.com');
@@ -9,7 +9,7 @@ describe('Admin Bookings Management', () => {
       win.localStorage.setItem('typegroup', 'Admin');
       win.localStorage.setItem('cypress_test', 'true');
     });
-    cy.visit('http://localhost:3000/pages/admin', { failOnStatusCode: false });
+    cy.visit('http://https://venture-spark.vercel.app/pages/admin', { failOnStatusCode: false });
     cy.wait(2000);
 
     // Navigate to bookings tab

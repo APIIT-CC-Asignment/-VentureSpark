@@ -49,7 +49,10 @@ function HeaderContent() {
 
   // Determine profile link based on user type
   const getProfileLink = () => {
-    if (typegroup === 'vendor') {
+    if (typegroup?.toLowerCase() === 'admin') {
+      return '/pages/admin';
+    }
+    if (typegroup?.toLowerCase() === 'vendor') {
       return '/pages/vendor-dashboard';
     }
     return '/pages/userprofile';
@@ -57,7 +60,10 @@ function HeaderContent() {
 
   // Profile link text based on user type
   const getProfileLinkText = () => {
-    if (typegroup === 'vendor') {
+    if (typegroup?.toLowerCase() === 'admin') {
+      return 'Admin Dashboard';
+    }
+    if (typegroup?.toLowerCase() === 'vendor') {
       return 'Vendor Dashboard';
     }
     return 'View Profile';

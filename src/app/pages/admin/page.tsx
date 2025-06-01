@@ -127,7 +127,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usergroup, setUsergroup] = useState<string | null>(null);
-  const [userFilterGroup, setUserFilterGroup] = useState("Admin");
+  const [userFilterGroup, setUserFilterGroup] = useState("admin");
   const [serviceStatusFilter, setServiceStatusFilter] = useState<
     "all" | "approved" | "rejected" | "pending"
   >("all");
@@ -162,8 +162,22 @@ export default function AdminDashboard() {
       const storedGroup = localStorage.getItem("typegroup");
       setEmail(storedEmail);
       setUsergroup(storedGroup);
+
+      // Check if user is logged in and is an admin
+      if (!storedEmail || !storedGroup) {
+        router.push('/pages/loginpage');
+        return;
+      }
+
+      if (storedGroup.toLowerCase() !== 'admin') {
+        router.push('/');
+        return;
+      }
+
+      // Only fetch data if user is admin
+      fetchDashboardData();
     }
-  }, []);
+  }, [router]);
 
   const fetchData = async (url: string) => {
     const response = await fetch(url);
@@ -193,12 +207,6 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (usergroup === "Admin") {
-      fetchDashboardData();
-    }
-  }, [usergroup]);
 
   const handleServiceStatusChange = async (
     serviceId: string,
@@ -283,7 +291,7 @@ export default function AdminDashboard() {
   };
 
 
-  if (!usergroup || usergroup !== "Admin") {
+  if (!usergroup || usergroup !== "admin") {
     return <Home />;
   }
   if (loading)
@@ -780,7 +788,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => handleFilterChange("Admin")}
-                  className={`px-4 py-2 text-sm font-medium rounded-r-lg ${userFilterGroup === "Admin"
+                  className={`px-4 py-2 text-sm font-medium rounded-r-lg ${userFilterGroup === "admin"
                     ? "bg-yellow-500 text-white"
                     : "bg-white text-gray-700 hover:bg-gray-50"
                     } border border-gray-300`}
@@ -837,7 +845,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                ${user.typegroup === 'Admin' ? 'bg-red-100 text-red-800' :
+                                ${user.typegroup === 'admin' ? 'bg-red-100 text-red-800' :
                                 user.typegroup === 'vendor' ? 'bg-blue-100 text-blue-800' :
                                   'bg-green-100 text-green-800'}`}>
                               {user.typegroup}
@@ -851,7 +859,7 @@ export default function AdminDashboard() {
                               Active
                             </span>
                           </td>
-                          
+
                         </tr>
                       ))}
                   </tbody>

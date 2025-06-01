@@ -12,7 +12,7 @@ type User = {
 export async function GET() {
   try {
     const result = await pool.query(
-      "SELECT id, username, email, typegroup, created_at FROM users ORDER BY created_at DESC"
+      "SELECT id, username, email, typegroup, createdat FROM users ORDER BY createdat DESC"
     );
 
     const users: User[] = result.rows.map((row) => ({
@@ -20,7 +20,7 @@ export async function GET() {
       username: row.username,
       email: row.email,
       typegroup: row.typegroup,
-      createdAt: row.created_at
+      createdAt: row.createdat
     }));
 
     return NextResponse.json(users, { status: 200 });

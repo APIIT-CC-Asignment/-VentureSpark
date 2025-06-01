@@ -401,6 +401,7 @@ export default function BookingPage() {
         alert(
           "Booking request submitted successfully! Please check your profile page for confirmation and further details."
         );
+        window.location.href = "https://buy.stripe.com/test_00wcN464G3OQ12h04bdEs01"
         setFormData({
           name: "",
           email: "",

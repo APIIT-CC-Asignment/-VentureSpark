@@ -6,7 +6,7 @@
  */
 Cypress.Commands.add('adminLogin', (options = {}) => {
   // Visit a neutral page first to set localStorage values
-  cy.visit('http://localhost:3000', { failOnStatusCode: false, ...options });
+  cy.visit('https://venture-spark.vercel.app', { failOnStatusCode: false, ...options });
 
   // Set localStorage values to bypass auth check in frontend
   cy.window().then((win) => {
@@ -21,7 +21,7 @@ Cypress.Commands.add('adminLogin', (options = {}) => {
   });
 
   // Now visit the admin page with localStorage values set
-  cy.visit('http://localhost:3000/pages/admin', { failOnStatusCode: false, ...options });
+  cy.visit('http://https://venture-spark.vercel.app/pages/admin', { failOnStatusCode: false, ...options });
 
   // Give page time to load
   cy.wait(2000);

@@ -2,7 +2,7 @@ import { defineConfig } from 'cypress';
 
 export default defineConfig({
     e2e: {
-        baseUrl: 'http://localhost:3000',
+        baseUrl: 'https://venture-spark.vercel.app',
         supportFile: 'cypress/support/e2e.ts',
         specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
         video: false,
@@ -19,7 +19,7 @@ export default defineConfig({
         failOnStatusCode: false,
     },
     env: {
-        apiUrl: 'http://localhost:3000/api',
+        apiUrl: 'http://https://venture-spark.vercel.app/api',
     },
     retries: {
         runMode: 2,

@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     // For vendor accounts, ensure we have the vendor ID
     let vendorId = user.id;
-    if (user.typegroup === 'vendor') {
+    if (user.typegroup.toLowerCase() === 'vendor') {
       // Check if there's a record in the Vendor table
       try {
         // FIX: Remove array destructuring, use .rows property
